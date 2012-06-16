@@ -7,11 +7,11 @@ Gem::Specification.new do |s|
   s.version     = HotTub::VERSION
   s.authors     = ["Joshua Mckinney"]
   s.email       = ["joshmckin@gmail.com"]
-  s.homepage    = ""
+  s.homepage    = "https://github.com/JoshMcKin/hot_tub"
   s.summary     = %q{A very simple ruby pool gem}
   s.description = %q{A very simple ruby pool gem}
 
-  s.rubyforge_project = "http_hot_tub"
+  s.rubyforge_project = "hot_tub"
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
