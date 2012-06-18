@@ -9,15 +9,10 @@ require 'spec_helper'
   end
 
 describe HotTub::Session do
-  
-  describe '#initialize' do
-     it "should raise ArgumentError if :client option is nil" do
-      lambda { HotTub::Session.new}.should raise_error(ArgumentError)
-    end
-  end
+
   before(:each) do
     @url = "http://www.testurl123.com/"
-    @tub = HotTub::Session.new(:client => MocClient.new(@url)) 
+    @tub = HotTub::Session.new(MocClient.new(@url)) 
   end
 
   context 'default configuration' do

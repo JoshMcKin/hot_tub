@@ -11,20 +11,16 @@ module HotTub
     # instead of raising this number
     # :never_block - if set to true, a connection will always be returned, but 
     # these extra connections are not added to the pool when the request is completed
-    def initialize(options={})     
+    def initialize(client,options={})     
       @options = {
         :size => 5,
         :never_block => false,
         :blocking_timeout => 0.5
       }.merge(options || {})
-      if @options[:client]
-        @pool = []
-        @pool_data = {:current_size => 0}   
-        @client = @options[:client]
-        @mutex = (@client.respond_to?(:mutex) ? @client.mutex : Mutex.new)
-      else
-        raise ArgumentError, "The option :client is required for HotTub::Session.new"
-      end
+      @pool = []
+      @pool_data = {:current_size => 0}   
+      @client = client
+      @mutex = (@client.respond_to?(:mutex) ? @client.mutex : Mutex.new)  
     end
             
     def pool

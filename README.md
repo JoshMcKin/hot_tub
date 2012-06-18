@@ -10,7 +10,7 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
 
 ## Setup 
     class MyClass
-      @@pool = HotTub::Session.new({:size => 2 :client => HotTub::EmSynchronyClient.new('https://google.com'), :never_block => true})
+      @@pool = HotTub::Session.new(HotTub::ExconClient.new('https://google.com'),{:size => 2, :never_block => true})
 
       def self.fetch_results(query)
         @@pool.get(:query => query) # keepalive has be defaulted to true in the client

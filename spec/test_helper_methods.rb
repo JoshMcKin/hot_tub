@@ -11,8 +11,7 @@ module TestHelperMethods
     normal = Time.now - start
     
     # we want a whole new pool to make sure we don't cheat
-    connection_pool = HotTub::Session.new(
-      :client => client)
+    connection_pool = HotTub::Session.new(client)
     
     start = Time.now
     50.times.each do
