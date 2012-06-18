@@ -68,8 +68,8 @@ module HotTub
     #   @pool = HotTub.new(HotTub::ExconClient.new("https://some_web_site.com"))
     #   results = []
     #   @pool.run do |client|
-    #     results.push  (client.get(:query => {:foo => "bar"}, :keepalive => true))
-    #     results.push  (client.get(:query => {:bar => "foo"}, :keepalive => true)) # reuse client
+    #     results.push  (client.get(:query => {:foo => "bar"}))
+    #     results.push  (client.get(:query => {:bar => "foo"})) # reuse client
     #   end
     #
     def run(&block)
@@ -88,8 +88,8 @@ module HotTub
     # requests has keep-alive properly set for your client
     # EX: 
     #   @pool = HotTub.new(HotTub::ExconClient.new("https://some_web_site.com"))
-    #   r1 = @pool.get(:query => {:foo => "bar"}, :keepalive => true)
-    #   r2 = @pool.get(:query => {:bar => "foo"}, :keepalive => true) # uses a different client
+    #   r1 = @pool.get(:query => {:foo => "bar"})
+    #   r2 = @pool.get(:query => {:bar => "foo"}) # uses a different client
     #
     def method_missing(method, *args, &blk)
       client = fetch
