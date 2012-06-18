@@ -1,6 +1,5 @@
 module HotTub
   class Session
-    AVAILABLE_CLIENTS = ["NetHttpClient","EmSynchronyClient"]
    
     # OPTIONS
     # * :size - number of connections for each pool
@@ -12,22 +11,25 @@ module HotTub
     # instead of raising this number
     # :never_block - if set to true, a connection will always be returned, but 
     # these extra connections are not added to the pool when the request is completed
-    def initialize(options={})
+    def initialize(options={})     
       @options = {
         :size => 5,
         :never_block => false,
-        :blocking_timeout => 0.5,
-        :client_options => {}
-      }.merge(options)
-      @pool = []
-      @pool_data = {:current_size => 0}   
-      @client = @options[:client]
-      @mutex = (@client.respond_to?(:mutex) ? @client.mutex : Client.mutex)
+        :blocking_timeout => 0.5
+      }.merge(options || {})
+      if @options[:client]
+        @pool = []
+        @pool_data = {:current_size => 0}   
+        @client = @options[:client]
+        @mutex = (@client.respond_to?(:mutex) ? @client.mutex : Mutex.new)
+      else
+        raise ArgumentError, "The option :client is required for HotTub::Session.new"
+      end
     end
             
     def pool
       @mutex.synchronize do
-        add if add?
+        add_client if add_client?
         @pool
       end
     end
@@ -102,12 +104,12 @@ module HotTub
     end
     
     private
-  
-    def add?
+    
+    def add_client?
       (@pool.empty? && (@pool_data[:current_size] < @options[:size]))
     end
         
-    def add
+    def add_client
       HotTub.logger.info "Adding HotTub client: #{@client.class.name} to pool"
       @pool_data[:current_size] += 1
       @pool << new_client         

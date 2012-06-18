@@ -9,12 +9,19 @@ require 'spec_helper'
   end
 
 describe HotTub::Session do
+  
+  describe '#initialize' do
+     it "should raise ArgumentError if :client option is nil" do
+      lambda { HotTub::Session.new}.should raise_error(ArgumentError)
+    end
+  end
   before(:each) do
     @url = "http://www.testurl123.com/"
     @tub = HotTub::Session.new(:client => MocClient.new(@url)) 
   end
 
   context 'default configuration' do
+   
     it "should have @pool_size of 5" do
       @tub.instance_variable_get(:@options)[:size].should eql(5)
     end
@@ -24,24 +31,24 @@ describe HotTub::Session do
     end
   end
         
-  describe '#add_connection?' do
+  describe '#add_client?' do
     it "should be true if @pool_data[:length] is less than desired pool size and 
     the pool is empty?"do
       @tub.instance_variable_set(:@pool_data,{:current_size => 1})
-      @tub.send(:add?).should be_true 
+      @tub.send(:add_client?).should be_true 
     end
           
     it "should be false pool has reached pool_size" do
       @tub.instance_variable_set(:@pool_data,{:current_size => 5})
       @tub.instance_variable_set(:@pool,
         ["connection","connection","connection","connection","connection"])
-      @tub.send(:add?).should be_false
+      @tub.send(:add_client?).should be_false
     end
   end
         
-  describe '#add_connection' do
+  describe '#add_client' do
     it "should add connections for supplied url"do
-      @tub.send(:add)
+      @tub.send(:add_client)
       @tub.instance_variable_get(:@pool).should_not be_nil
     end
   end   
