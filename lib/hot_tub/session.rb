@@ -3,8 +3,7 @@ module HotTub
    
     # OPTIONS
     # * :size - number of connections for each pool
-    # * :inactivity_timeout - number of seconds to wait before disconnecting, 
-    # setting to 0 means the connection will not be closed
+    # * :inactivity_timeout - number of seconds to wait before disconnecting, setting to 0 means the connection will not be closed
     # * :pool_timeout - the amount of seconds to block waiting for an availble connection, 
     # because this is blocking it should be an extremely short amount of 
     # time default to 0.5 seconds, if you need more consider enlarging your pool
@@ -66,7 +65,7 @@ module HotTub
     # is used for mulitple requests. For HTTP requests make sure you request has
     # keep-alive properly set for your client
     # EX:
-    #   @pool = HotTub.new("https://some_web_site.com")
+    #   @pool = HotTub.new(HotTub::ExconClient.new("https://some_web_site.com"))
     #   results = []
     #   @pool.run do |client|
     #     results.push  (client.get(:query => {:foo => "bar"}, :keepalive => true))
@@ -88,7 +87,7 @@ module HotTub
     # Let pool instance respond to client methods. For HTTP request make sure you 
     # requests has keep-alive properly set for your client
     # EX: 
-    #   @pool = HotTub.new("https://some_web_site.com")
+    #   @pool = HotTub.new(HotTub::ExconClient.new("https://some_web_site.com"))
     #   r1 = @pool.get(:query => {:foo => "bar"}, :keepalive => true)
     #   r2 = @pool.get(:query => {:bar => "foo"}, :keepalive => true) # uses a different client
     #
