@@ -13,14 +13,14 @@ module HotTub
     end
     
     # pretty sure HttpClient handles this internally
-    def sanitize_hot_tub_client
+    def clean
       @client
     end
     
-    def close_hot_tub_client
+    def close
       @client.shutdown
     end
-    
+    # HttpClient has different initialization attributes so we need a custom dup
     def dup
       self.class.new(@options)
     end  

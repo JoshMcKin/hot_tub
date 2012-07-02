@@ -39,7 +39,6 @@ module HotTub
       # block until we get an available connection or Timeout::Error     
       while client.nil?
         raise_alarm if alarm <= Time.now
-
         client = pool.shift
         if client.nil? && (@options[:never_block])
           HotTub.logger.info "Adding never_block client for #{@client.class.name}, will not be returned to pool."
@@ -47,14 +46,14 @@ module HotTub
           client.mark_temporary
         end
       end
-      client.sanitize_hot_tub_client
+      client.clean
       client
     end
   
     # return a client to the pool
     def return_client(client)
       if client.temporary?
-        client.close_hot_tub_client # Too hot in the hot tub...
+        client.close # Too hot in the hot tub...
       else
         @pool << client 
       end

@@ -12,16 +12,13 @@ module HotTub
     end
     
     # pretty sure Excon handles this internally
-    def sanitize_hot_tub_client
+    def clean
       @client
     end
     
-    def close_hot_tub_client
+    def close
       @client.socket.close
     end
-    
-    def dup
-      self.class.new(@url,@options)
-    end
+
   end
 end

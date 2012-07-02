@@ -23,12 +23,16 @@ module HotTub
     
     # Override this method to perform the necessary action for ensure a client
     # is clean for use.
-    def sanitize_hot_tub_client
+    def clean
       @client
     end
     
-    def close_hot_tub_client
+    def close
       @client
+    end
+    
+    def dup
+      self.class.new(@url,@options)
     end
     
     class << self

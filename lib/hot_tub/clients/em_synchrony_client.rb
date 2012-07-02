@@ -9,7 +9,7 @@ module HotTub
       @client = EM::HttpRequest.new(url,options)
     end
     
-    def sanitize_hot_tub_client     
+    def clean   
       if @client.conn && @client.conn.error?
         HotTub.logger.info "Sanitizing connection : #{EventMachine::report_connection_error_status(@client.conn.instance_variable_get(:@signature))}"
         @client.conn.close_connection
@@ -18,7 +18,7 @@ module HotTub
       @client
     end
     
-    def close_hot_tub_client
+    def close
       @client.conn.close_connection if @client.conn
     end
     
@@ -29,10 +29,6 @@ module HotTub
         options[:keepalive] = true
         @client.send(m,options,&blk)
       end
-    end
-    
-    def dup
-      self.class.new(@url,@options)
     end
     
     class << self
