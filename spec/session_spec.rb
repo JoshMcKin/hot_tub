@@ -48,20 +48,20 @@ describe HotTub::Session do
     end
   end   
         
-  describe '#fetch_connection' do
+  describe '#fetch' do
     it "should raise Timeout::Error if an available is not found in time"do
       @tub.stub(:pool).and_return([])
-      lambda { @tub.fetch}.should raise_error(Timeout::Error)
+      lambda { @tub.send(:fetch)}.should raise_error(Timeout::Error)
     end
     
     it "should not raise Timeout::Error if an available is not found in time"do
       @tub.instance_variable_get(:@options)[:never_block] = true
       @tub.stub(:pool).and_return([])
-      lambda { @tub.fetch}.should_not raise_error(Timeout::Error)
+      lambda { @tub.send(:fetch)}.should_not raise_error(Timeout::Error)
     end
     
     it "should return an instance of the driver" do
-      @tub.fetch.should be_instance_of(MocClient)
+      @tub.send(:fetch).should be_instance_of(MocClient)
     end
   end
   

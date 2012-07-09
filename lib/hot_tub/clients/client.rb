@@ -13,14 +13,6 @@ module HotTub
       @client.send(method,*args,&blk)
     end
     
-    def temporary?
-      @temporary == true
-    end
-    
-    def mark_temporary
-      @temporary = true
-    end
-    
     # Override this method to perform the necessary action for ensure a client
     # is clean for use.
     def clean
