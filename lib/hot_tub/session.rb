@@ -1,129 +1,64 @@
+require 'uri'
 module HotTub
   class Session
-   
-    # OPTIONS
-    # * :size - number of clients/connections for each pool
-    # * :inactivity_timeout - number of seconds to wait before disconnecting, setting to 0 means the connection will not be closed
-    # * :pool_timeout - the amount of seconds to block waiting for an available client, 
-    # because this is blocking it should be an extremely short amount of 
-    # time default to 0.5 seconds, if you need more consider enlarging your pool
-    # instead of raising this number
-    # :never_block - if set to true, a client will always be returned, 
-    # but the pool size will never grow past that :size option, extra clients are closed
-    def initialize(client,options={})     
-      @options = {
-        :size => 5,
-        :never_block => false,
-        :blocking_timeout => 0.5
-      }.merge(options || {})
-      @pool = []
-      @pool_data = {:current_size => 0}   
-      @client = client
-      @mutex = (@client.respond_to?(:mutex) ? @client.mutex : Mutex.new)  
-    end
-    
-    # The synchronized pool for all our clients.
+
+    # A HotTub::Session is a synchronized hash used to separate HotTub::Pools by their domain.
+    # EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to 
+    # manage multiple pools like when a process need to connect to various AWS resources. Sessions 
+    # are unnecessary for HTTPClient because the client has its own threads safe sessions object.
+    # Example:
     #
-    def pool(client=nil)
-      @mutex.synchronize do
-        if client
-          return_client(client)
-        else   
-          add_client if add_client?
-       end
-        @pool
-      end
-    end
-    
-    # Run the block on the retrieved client. Good for ensure the same client
-    # is used for multiple requests. For HTTP requests make sure you request has
-    # keep-alive properly set for your client
-    # EX:
-    #   @pool = HotTub.new(HotTub::ExconClient.new("https://some_web_site.com"))
-    #   results = []
-    #   @pool.run do |client|
-    #     results.push  (client.get(:query => {:foo => "bar"}))
-    #     results.push  (client.get(:query => {:bar => "foo"})) # reuse client
+    #   sessions = HotTub::Session.new(:client_options => {:connect_timeout => 10})
+    #
+    #   sessions.run("https://wwww.yahoo.com") do |conn|
+    #     p conn.head.response_header.status
     #   end
     #
-    def run(&block)
-      client = fetch     
-      if block_given?
-        block.call(client)
-      else
-        raise ArgumentError, 'Run requires a block.'
-      end
-    ensure
-      pool(client) if client
-    end
-   
-
-    # Let pool instance respond to client methods. For HTTP request make sure you 
-    # requests has keep-alive properly set for your client
-    # EX: 
-    #   @pool = HotTub.new(HotTub::ExconClient.new("https://some_web_site.com"))
-    #   r1 = @pool.get(:query => {:foo => "bar"})
-    #   r2 = @pool.get(:query => {:bar => "foo"}) # uses a different client
+    #   sessions.run("https://wwww.google.com") do |conn|
+    #     p conn.head.response_header.status
+    #   end
+    # 
+    # Other client classes
+    # If you have your own client class you can use sessions but your client class must initialize similar to
+    # EmHttpRequest, accepting a URI and options see: hot_tub/clients/em_http_request_client.rb
+    # Example Custom Client:
     #
-    def method_missing(method, *args, &blk)
-      client = fetch
-      client.send(method,*args,&blk)
-    ensure
-      pool(client) if client
+    #   sessions = HotTub::Session.new(:client_class => MyClient, :client_options => {:connect_timeout => 10})
+    #
+    #   sessions.run("https://wwww.yahoo.com") do |conn|
+    #     p conn.head.response_header.status # => create pool for "https://wwww.yahoo.com"
+    #   end
+    #
+    #   sessions.run("https://wwww.google.com") do |conn|
+    #     p conn.head.response_header.status # => create separate pool for "https://wwww.google.com"
+    #   end
+    def initialize(options={},&client_block)
+      raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
+      @client_block = client_block
+      @options = {
+        :size => 5,
+        :never_block => true,
+        :blocking_timeout => 10,
+        :client_class => nil, # EmHttpRequestClient
+        :client_options => {}
+      }.merge(options || {})
+      @sessions = Hash.new
+      @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
     end
-    
-    private
-    
-    def add_client?
-      (@pool.empty? && (@pool_data[:current_size] < @options[:size]))
-    end
-             
-    def new_client
-      @client.dup
-    end 
-        
-    def add_client
-      HotTub.logger.info "Adding HotTub client: #{@client.class.name} to pool"
-      @pool_data[:current_size] += 1
-      @pool << new_client         
-      @pool
-    end
-    
-    # return a client to the pool
-    def return_client(client)
-      if @pool.length < @options[:size]
-        @pool << client
-      else
-        HotTub.logger.info "Closed extra client for #{@client.class.name}."
-        client.close # Too hot in the hot tub...
+
+    # Synchronize access to our key hash
+    # expects a url string or URI
+    def sessions(url)
+      @mutex.synchronize do
+        uri = URI(url) unless url.is_a?(URI)
+        @sessions["#{uri.shema}-#{uri.host}"] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
       end
     end
-    
-    # Fetches an available client from the pool.
-    # Hot tubs are not always clean... Make sure we have a good client. The client
-    # should respond to clean, which checks to make sure the client is still 
-    # viable, and reset if necessary.
-    def fetch        
-      client = nil
-      alarm = (Time.now + @options[:blocking_timeout])       
-      # block until we get an available client or raise Timeout::Error     
-      while client.nil?
-        raise_alarm if alarm <= Time.now
-        client = pool.shift
-        if client.nil? && (@options[:never_block])
-          HotTub.logger.info "Adding never_block client for #{@client.class.name}."
-          client = new_client
-          client.mark_temporary
-        end
-      end
-      client.clean
-      client
-    end
- 
-    def raise_alarm
-      message = "Could not fetch a free client in time. Consider increasing your pool size for #{@client.class.name}."
-      HotTub.logger.error message
-      raise Timeout::Error, message    
+
+    # Hand off to pool.run
+    def run(url,&block)
+      pool = sessions(url)
+      pool.run(&block) if pool
     end
   end
 end
