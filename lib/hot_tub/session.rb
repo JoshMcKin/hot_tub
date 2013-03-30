@@ -51,7 +51,7 @@ module HotTub
     def sessions(url)
       @mutex.synchronize do
         uri = URI(url) unless url.is_a?(URI)
-        @sessions["#{uri.shema}-#{uri.host}"] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
+        @sessions["#{uri.scheme}-#{uri.host}"] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
       end
     end
 
