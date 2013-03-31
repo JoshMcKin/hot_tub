@@ -3,8 +3,8 @@ module HotTub
   class Session
 
     # A HotTub::Session is a synchronized hash used to separate HotTub::Pools by their domain.
-    # EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to 
-    # manage multiple pools like when a process need to connect to various AWS resources. Sessions 
+    # EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to
+    # manage multiple pools like when a process need to connect to various AWS resources. Sessions
     # are unnecessary for HTTPClient because the client has its own threads safe sessions object.
     # Example:
     #
@@ -17,7 +17,7 @@ module HotTub
     #   sessions.run("https://wwww.google.com") do |conn|
     #     p conn.head.response_header.status
     #   end
-    # 
+    #
     # Other client classes
     # If you have your own client class you can use sessions but your client class must initialize similar to
     # EmHttpRequest, accepting a URI and options see: hot_tub/clients/em_http_request_client.rb
@@ -50,7 +50,13 @@ module HotTub
     # expects a url string or URI
     def sessions(url)
       @mutex.synchronize do
-        uri = URI(url) unless url.is_a?(URI)
+        if url.is_a?(String)
+          uri = URI(url)
+        elsif url.is_a?(URI)
+          uri = url
+        else
+          raise ArgumentError, "you must pass a string or a URI object"
+        end
         @sessions["#{uri.scheme}-#{uri.host}"] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
       end
     end

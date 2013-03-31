@@ -70,7 +70,9 @@ describe HotTub::Pool do
     end
 
     it "should work" do
-      @pool.run{|clnt| clnt.get('https://www.google.com')}
+      status = 0
+      @pool.run{|clnt| status = clnt.head('https://www.google.com').status}
+      status.should eql(200)
     end
 
     context "block given" do
