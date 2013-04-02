@@ -59,18 +59,15 @@ module HotTub
       @client_block = (block_given? ? client_block : lambda { HTTPClient.new })
       @options = {
         :size => 5,
-        :never_block => true,
-        :blocking_timeout => 10,
-        :close => nil,
-        :clean => nil
+        :never_block => true,     # Return new client if we run out
+        :blocking_timeout => 10,  # in seconds
+        :close => nil,            # => lambda {|clnt| clnt.close}
+        :clean => nil             # => lambda {|clnt| clnt.clean}
       }.merge(options)
       @pool = []
       @current_size = 0
       @clients = []
       @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
-      @blocking_timeout = @options[:blocking_timeout]
-      @never_block = @options[:never_block]
-      @size = @options[:size]
     end
 
     # Hand off to client.run
@@ -105,7 +102,7 @@ module HotTub
     # Returns an instance of the client for this pool.
     def client
       clnt = nil
-      alarm = (Time.now + @blocking_timeout)
+      alarm = (Time.now + @options[:blocking_timeout])
       # block until we get an available client or raise Timeout::Error
       while clnt.nil?
         raise_alarm if alarm <= Time.now
@@ -142,7 +139,7 @@ module HotTub
     # Safely add client back to pool
     def push(clnt)
       @mutex.synchronize do
-        if @pool.length < @size
+        if @pool.length < @options[:size]
           @pool << clnt
         else
           @clients.delete(clnt)
@@ -157,7 +154,7 @@ module HotTub
       @mutex.synchronize do
         add if add?
         clnt = @pool.pop
-        if (clnt.nil? && @never_block)
+        if (clnt.nil? && @options[:never_block])
           HotTub.logger.info "Adding never_block client for #{@client.class.name}."
           clnt = new_client
         end
@@ -175,7 +172,7 @@ module HotTub
     # Only want to add a client if the pool is empty in keeping with
     # a lazy model.
     def add?
-      (@pool.length == 0 && @current_size <= @size)
+      (@pool.length == 0 && @current_size <= @options[:size])
     end
 
     def add
