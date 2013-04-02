@@ -1,4 +1,4 @@
-# HotTub
+# HotTub [![Build Status](https://travis-ci.org/JoshMcKin/hot_tub.png?branch=master)](https://travis-ci.org/JoshMcKin/hot_tub)
 A simple thread-safe connection pooling gem. Supports [HTTPClient](https://github.com/nahi/httpclient) (default) and
 [EM-Http-Requests](https://github.com/igrigorik/em-http-request) via [EM-Synchrony](https://github.com/igrigorik/em-synchrony). 
 There are a couple Ruby connection pool libraries out there but HotTub differs from most in that its connections are lazy 
