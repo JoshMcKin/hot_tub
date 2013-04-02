@@ -2,7 +2,7 @@
 A simple thread-safe connection pooling gem. Supports [HTTPClient](https://github.com/nahi/httpclient) (default) and
 [EM-Http-Requests](https://github.com/igrigorik/em-http-request) via [EM-Synchrony](https://github.com/igrigorik/em-synchrony). 
 There are a couple Ruby connection pool libraries out there but HotTub differs from most in that its connections are lazy 
-(created only when necessary), accomidates libraries that do not clean their dirty connections automatically, and manages unexpected usage increases by opening new connections rather than just blocking or throwings exception (never_block), although never_block can be disabled. 
+(created only when necessary), accomidates libraries that do not clean their dirty connections automatically, and manages unexpected usage increases by opening new connections rather than just blocking or throwing exceptions (never_block), although never_block can be disabled. 
 
 ## Installation
 
@@ -69,6 +69,7 @@ seperate pools for you various domains based on URI.
     # Assuming EM is running
     require 'hot_tub/clients/em_http_request_client'
     class EMClass
+      # Our client block must accept the url argument
       @@sessons = HotTub::Sessions.new {|url| HotTub::EmHttpRequestClient.new(url,{:connect_timeout => 5}) }
       def async_post_results(query = {})
         @@sessons.run("http://somewebservice.com") do |connection|    
