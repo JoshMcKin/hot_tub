@@ -13,7 +13,6 @@ Gem::Specification.new do |s|
   s.description = %q{A simple thread-safe http connection pooling gem. Http client options include HTTPClient and EM-Http-Request}
 
   s.rubyforge_project = "hot_tub"
-  s.add_runtime_dependency "httpclient"
   s.add_development_dependency "rspec"
   
   s.files         = `git ls-files`.split("\n")

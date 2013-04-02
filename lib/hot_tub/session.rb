@@ -3,14 +3,13 @@ module HotTub
   class Session
 
     # A HotTub::Session is a synchronized hash used to separate HotTub::Pools by their domain.
-    # EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to
-    # manage multiple pools like when a process need to connect to various AWS resources. Sessions
-    # are unnecessary for HTTPClient because the client has its own threads safe sessions object.
+    # Excon and EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to
+    # manage multiple pools like when a process need to connect to various AWS resources.
     # Example:
     #
-    #   sessions = HotTub::Session.new(:client_options => {:connect_timeout => 10})
+    #   sessions = HotTub::Session.new(:client_options => {:connect_timeout => 10}) { |url| Excon.new(url) }
     #
-    #   sessions.run("https://wwww.yahoo.com") do |conn|
+    #   sessions.run("http://wwww.yahoo.com") do |conn|
     #     p conn.head.response_header.status
     #   end
     #
@@ -23,7 +22,7 @@ module HotTub
     # EmHttpRequest, accepting a URI and options see: hot_tub/clients/em_http_request_client.rb
     # Example Custom Client:
     #
-    #   sessions = HotTub::Session.new(:client_class => MyClient, :client_options => {:connect_timeout => 10})
+    #   sessions = HotTub::Session.new({:never_block => false})  { |url| Excon.new(url) }
     #
     #   sessions.run("https://wwww.yahoo.com") do |conn|
     #     p conn.head.response_header.status # => create pool for "https://wwww.yahoo.com"
@@ -35,13 +34,7 @@ module HotTub
     def initialize(options={},&client_block)
       raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
       @client_block = client_block
-      @options = {
-        :size => 5,
-        :never_block => true,
-        :blocking_timeout => 10,
-        :client_class => nil, # EmHttpRequestClient
-        :client_options => {}
-      }.merge(options || {})
+      @options = options || {} 
       @sessions = Hash.new
       @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
     end

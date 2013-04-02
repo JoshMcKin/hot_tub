@@ -1,13 +1,9 @@
-require 'httpclient'
 module HotTub
   class Pool
     attr_reader :current_size
     KNOWN_CLIENTS = {
-      "HTTPClient" => {
-        :close => lambda { |clnt|
-          sessions = clnt.instance_variable_get(:@session_manager)
-          sessions.reset_all if sessions
-        }
+      "Excon::Connection" => {
+        :close => lambda { |clnt| clnt.reset }
       },
       'EventMachine::HttpConnection' => {
         :close => lambda { |clnt|
@@ -27,15 +23,13 @@ module HotTub
       }
     }
 
-    # Generic lazy connection pool of HTTP clients
-    # The default client is HTTPClient.
-    # Clients must respond to :clean, :close, and :run
+    # Thread-safe lazy connection pool
     #
-    # == Example (HTTPClient)
-    #     pool = HotTub::Pool.new(:size => 25)
-    #     pool.run {|clnt| clnt.get('http://test.com').body }
+    # == Example Excon
+    #     pool = HotTub::Pool.new(:size => 25)  { Excon.new('http://test.com') }
+    #     pool.run {|clnt| clnt.get.body }
     #
-    # == Example with different client
+    # == Example EM-Http-Request
     #     pool = HotTub::Pool.new { EM::HttpRequest.new("http://somewebservice.com") }
     #     pool.run {|clnt| clnt.get(:keepalive => true).body }
     #
@@ -46,17 +40,18 @@ module HotTub
     # add new connections set :never_block to false; blocking_timeout defaults to 10 seconds.
     #
     # == Example without #never_block (will BlockingTimeout exception)
-    #     pool = HotTub::Pool.new(:size => 1, :never_block => false, :blocking_timeout => 0.5)
+    #     pool = HotTub::Pool.new(:size => 1, :never_block => false, :blocking_timeout => 0.5) { Excon.new('http://test.com') }
     #
     #     begin
-    #       pool.run {|clnt| clnt.get('http://test.com').body }
+    #       pool.run {|clnt| clnt.get.body }
     #     rescue HotTub::BlockingTimeout => e
     #       puts "Our pool ran out: {e}"
     #     end
     #
     def initialize(options={},&client_block)
+      raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
       at_exit { close_all } # close connections at exit
-      @client_block = (block_given? ? client_block : lambda { HTTPClient.new })
+      @client_block = client_block
       @options = {
         :size => 5,
         :never_block => true,     # Return new client if we run out

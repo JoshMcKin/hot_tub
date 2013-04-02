@@ -7,19 +7,19 @@ describe HotTub::Pool do
 
   context 'default settings' do
     before(:each) do
-      @pool = HotTub::Pool.new()
+      @pool = HotTub::Pool.new { MocClient.new }
     end
 
     it "should have :size of 5" do
-      @pool.instance_variable_get(:@options)[:size].should eql(5)
+      @pool.instance_variable_get(:@options)[:size].should eql(5) 
     end
 
     it "should have :blocking_timeout of 0.5" do
       @pool.instance_variable_get(:@options)[:blocking_timeout].should eql(10)
     end
 
-    it "should have default :client" do
-      @pool.instance_variable_get(:@client_block).call.should be_a(HTTPClient)
+    it "should have set the client" do
+      @pool.instance_variable_get(:@client_block).call.should be_a(MocClient)
     end
 
     it "should be true" do
@@ -40,10 +40,6 @@ describe HotTub::Pool do
       @pool.instance_variable_get(:@options)[:blocking_timeout].should eql(1.0)
     end
 
-    it "should have defult :client" do
-      @pool.instance_variable_get(:@client_block).call.should be_a(MocClient)
-    end
-
     it "should be true" do
       @pool.instance_variable_get(:@options)[:never_block].should be_false
     end
@@ -51,7 +47,7 @@ describe HotTub::Pool do
 
   describe '#run' do
     before(:each) do
-      @pool = HotTub::Pool.new
+      @pool = HotTub::Pool.new { Excon.new('https://www.google.com')}
     end
 
     it "should remove connection from pool when doing work" do
@@ -71,14 +67,14 @@ describe HotTub::Pool do
 
     it "should work" do
       status = 0
-      @pool.run{|clnt| status = clnt.head('https://www.google.com').status}
+      @pool.run{|clnt| status = clnt.head.status}
       status.should eql(200)
     end
 
     context "block given" do
       it "should call the supplied block" do
         status = nil
-        @pool.run { |con| status = con.get('https://google.com').status}
+        @pool.run { |con| status = con.get.status}
         status.should_not be_nil
       end
     end
@@ -92,7 +88,7 @@ describe HotTub::Pool do
 
   describe '#close_all' do
     before(:each) do
-      @pool = HotTub::Pool.new(:size => 5)
+      @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
       5.times do
         @pool.send(:add)
       end
@@ -111,7 +107,7 @@ describe HotTub::Pool do
   context 'private methods' do
     before(:each) do
       @url = "http://www.testurl123.com/"
-      @pool = HotTub::Pool.new()
+      @pool = HotTub::Pool.new { Excon.new(@url)}
     end
 
     describe '#client' do
@@ -122,7 +118,7 @@ describe HotTub::Pool do
       end
 
       it "should return an instance of the driver" do
-        @pool.send(:client).should be_instance_of(HTTPClient)
+        @pool.send(:client).should be_instance_of(Excon::Connection)
       end
     end
 
@@ -151,13 +147,13 @@ describe HotTub::Pool do
   context 'thread safety' do
     it "should work" do
       url = "https://www.google.com/"
-      pool = HotTub::Pool.new({:size => 20})
+      pool = HotTub::Pool.new({:size => 10}) { Excon.new(url) }
       failed = false
       lambda {
         threads = []
         20.times.each do
           threads << Thread.new do
-            pool.run{|connection| failed = true unless connection.head(url).status == 200}
+            pool.run{|connection| failed = true unless connection.get.status == 200}
           end
         end
         sleep(0.01)
@@ -165,7 +161,7 @@ describe HotTub::Pool do
           t.join
         end
       }.should_not raise_error
-      pool.instance_variable_get(:@pool).length.should eql(20) # make sure work got done
+      pool.instance_variable_get(:@pool).length.should eql(10) # make sure work got done
       failed.should be_false # Make sure our requests woked
     end
   end
