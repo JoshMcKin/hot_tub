@@ -55,6 +55,7 @@ module HotTub
     #     end
     #
     def initialize(options={},&client_block)
+      at_exit { close_all } # close connections at exit
       @client_block = (block_given? ? client_block : lambda { HTTPClient.new })
       @options = {
         :size => 5,
@@ -183,6 +184,8 @@ module HotTub
       @current_size += 1
       @pool << new_client
     end
+    
+
   end
   class BlockingTimeout < StandardError;end
 end
