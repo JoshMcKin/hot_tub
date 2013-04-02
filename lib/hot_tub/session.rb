@@ -49,15 +49,17 @@ module HotTub
     # Synchronize access to our key hash
     # expects a url string or URI
     def sessions(url)
+      if url.is_a?(String)
+        uri = URI(url)
+      elsif url.is_a?(URI)
+        uri = url
+      else
+        raise ArgumentError, "you must pass a string or a URI object"
+      end
+      key = "#{uri.scheme}-#{uri.host}"
+      return @sessions[key] if @sessions[key]
       @mutex.synchronize do
-        if url.is_a?(String)
-          uri = URI(url)
-        elsif url.is_a?(URI)
-          uri = url
-        else
-          raise ArgumentError, "you must pass a string or a URI object"
-        end
-        @sessions["#{uri.scheme}-#{uri.host}"] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
+        @sessions[key] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
       end
     end
 

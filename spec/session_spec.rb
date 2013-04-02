@@ -94,4 +94,30 @@ describe HotTub::Session do
       status.should eql(200)
     end
   end
+
+  context 'thread safety' do
+    it "should work" do
+      url = "https://www.google.com/"
+      url2 = "https://www.yahoo.com/"
+      session = HotTub::Session.new({:size => 20}) { |a_url| HTTPClient.new}
+      failed = false
+      lambda {
+        threads = []
+        20.times.each do
+          threads << Thread.new do
+            session.run(url){|connection| failed = true unless connection.head(url).status == 200}
+            session.run(url2){|connection| failed = true unless connection.head(url).status == 200}
+          end
+        end
+        sleep(0.01)
+        threads.each do |t|
+          t.join
+        end
+      }.should_not raise_error
+      session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure work got done
+      session.instance_variable_get(:@sessions).values.first.instance_variable_get(:@pool).length.should eql(20) # make sure work got done
+      session.instance_variable_get(:@sessions).values.last.instance_variable_get(:@pool).length.should eql(20) # make sure work got done
+      failed.should be_false # Make sure our requests woked
+    end
+  end
 end
