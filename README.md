@@ -64,7 +64,7 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
 HTTPClient has a built in thread-safe sessions feature that allows a single client to access multiple domains. 
 Not all clients have a sessions feature, Em-Http-Request clients are initialized to a single domain and while you
 can change paths the client domain cannot change. HotTub::Session allows you create a session object that initializes
-seperate pools for you various domains based on URI.
+seperate pools for your various domains based on URI.
 
     # Assuming EM is running
     require 'hot_tub/clients/em_http_request_client'
