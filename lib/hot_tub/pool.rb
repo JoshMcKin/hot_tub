@@ -124,7 +124,6 @@ module HotTub
       end
     end
 
-
     # Attempts to close the provided client, checking the options first for a close block
     # then checking the known clients
     def close_client(clnt)
@@ -184,8 +183,6 @@ module HotTub
       @current_size += 1
       @pool << new_client
     end
-    
-
   end
   class BlockingTimeout < StandardError;end
 end
