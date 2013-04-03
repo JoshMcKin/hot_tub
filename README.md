@@ -1,5 +1,5 @@
 # HotTub [![Build Status](https://travis-ci.org/JoshMcKin/hot_tub.png?branch=master)](https://travis-ci.org/JoshMcKin/hot_tub)
-A simple thread-safe connection pooling gem. Supports [HTTPClient](https://github.com/nahi/httpclient) (default) and
+A simple thread-safe connection pooling gem. Out-of-the-box support for [Excon](https://github.com/geemus/excon) and
 [EM-Http-Requests](https://github.com/igrigorik/em-http-request) via [EM-Synchrony](https://github.com/igrigorik/em-synchrony). 
 There are a couple Ruby connection pool libraries out there but HotTub differs from most in that its connections are lazy 
 (created only when necessary), accomidates libraries that do not clean their dirty connections automatically, and manages unexpected usage increases by opening new connections rather than just blocking or throwing exceptions (never_block), although never_block can be disabled. 
@@ -12,14 +12,15 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
 
 ## Usage 
 
-### Default (HTTPClient)
+### Excon
 
+    require 'excon'
     class MyClass
       @@url = "http://test12345.com"
-      @@pool = HotTub::Pool.new({:size => 10})
+      @@pool = HotTub::Pool.new({:size => 10}) { Excon.new("http://somewebservice.com") }
       def self.fetch_results(url,query={})
         @@pool.run |connection|
-          connection.get(@@url,query).body
+          connection.get(:query => query).body
         end
       end
     end
@@ -47,6 +48,7 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
  You can use any libary you want. Close and clean can be defined at initialization with
  lambdas, if they are not defined they are ignored.
 
+    require 'excon'
     class MyClass
       @@url = "http://test12345.com"
       @@pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
@@ -59,18 +61,31 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
 
     MyClass.fetch_results({:foo => "goo"}) # => "Some reponse"
 
-## Sessions
-
-HTTPClient has a built in thread-safe sessions feature that allows a single client to access multiple domains. 
-Not all clients have a sessions feature, Em-Http-Request clients are initialized to a single domain and while you
+## Sessions with Pool
+Not all clients have a sessions feature, Excon and Em-Http-Request clients are initialized to a single domain and while you
 can change paths the client domain cannot change. HotTub::Session allows you create a session object that initializes
 seperate pools for your various domains based on URI.
 
-    # Assuming EM is running
-    require 'hot_tub/clients/em_http_request_client'
-    class EMClass
+    require 'excon'
+    class MyClass
       # Our client block must accept the url argument
-      @@sessons = HotTub::Sessions.new {|url| HotTub::EmHttpRequestClient.new(url,{:connect_timeout => 5}) }
+      @@sessons = HotTub::Sessions.new {|url| { Excon.new(url) } 
+      def async_post_results(query = {})
+        @@sessons.run("http://somewebservice.com") do |connection|    
+          puts connection.run(:query => results).response_header.status
+        end
+        @@sessons.run("https://someotherwebservice.com") do |connection|    
+          puts connection.get(:query => results).response_header.status
+        end
+      end
+    end
+
+## Sessions without Pool
+If you have a client that is thread safe but does not support sessions you can implement sessions similarly.
+
+    class MyClass
+      # Our client block must accept the url argument
+      @@sessons = HotTub::Sessions.new(:with_pool => false) {|url| MyThreadSafeLib.new(url) }
       def async_post_results(query = {})
         @@sessons.run("http://somewebservice.com") do |connection|    
           puts connection.get(:query => results).response_header.status
@@ -83,9 +98,10 @@ seperate pools for your various domains based on URI.
 
 ## Related
 
-* [HTTPClient](https://github.com/nahi/httpclient)
 * [EM-Http-Request](https://github.com/igrigorik/em-http-request)
 * [EM-Synchrony](https://github.com/igrigorik/em-synchrony)
+* [Excon](https://github.com/geemus/excon)
+* [HTTPClient](https://github.com/nahi/httpclient) A thread safe http client that supports sessions all by itself.
 
 ## Other Pooling Gem
 

@@ -16,6 +16,14 @@ describe HotTub::Session do
       @sessions = HotTub::Session.new { |url| MocClient.new(url) }
     end
 
+    context 'default options' do
+      describe ':with_pool' do
+        it "with_pool should be true" do
+          @sessions.instance_variable_get(:@options)[:with_pool].should be_true
+        end
+      end
+    end
+
     describe '#to_url' do
       context "passed URL string" do
         it "should return key with URI scheme-domain" do
@@ -40,25 +48,47 @@ describe HotTub::Session do
     end
 
     describe '#sessions' do
-      it "should add a new pool for the url" do
-        @sessions.sessions(@url)
-        sessions = @sessions.instance_variable_get(:@sessions)
-        sessions.length.should eql(1)
-        sessions.first[1].should be_a(MocClient)
+
+      context ':with_pool is true (default)' do
+        it "should add a new pool for the url" do
+          @sessions.sessions(@url)
+          sessions = @sessions.instance_variable_get(:@sessions)
+          sessions.length.should eql(1)
+          sessions.first[1].should be_a(HotTub::Pool)
+        end
+
+        it "should pass options to pool" do
+          with_pool_options = HotTub::Session.new(:size => 13, :never_block => false) { |url| MocClient.new(url) }
+          with_pool_options.sessions(@url)
+          sessions = with_pool_options.instance_variable_get(:@sessions)
+          pool_options = sessions.first[1].instance_variable_get(:@options)
+          pool_options[:size].should eql(13)
+          pool_options[:never_block].should be_false
+        end
+      end
+
+      context ':with_pool is false' do
+        it "should add a new client for the url" do
+          no_pool = HotTub::Session.new(:with_pool => false) { |url| MocClient.new(url) }
+          no_pool.sessions(@url)
+          sessions = no_pool.instance_variable_get(:@sessions)
+          sessions.length.should eql(1)
+          sessions.first[1].should be_a(MocClient)
+        end
       end
 
       context "passed URL string" do
         it "should set key with URI scheme-domain" do
           @sessions.sessions(@url)
           sessions = @sessions.instance_variable_get(:@sessions)
-          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
+          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(HotTub::Pool)
         end
       end
       context "passed URI" do
         it "should set key with URI scheme-domain" do
           @sessions.sessions(@uri)
           sessions = @sessions.instance_variable_get(:@sessions)
-          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
+          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(HotTub::Pool)
         end
       end
     end
@@ -104,7 +134,6 @@ describe HotTub::Session do
         results.uniq.should eql([results.first]) # make sure we got the same results
         ((stop_time.to_i - start_time.to_i) < (results.length * MocClient.sleep_time)).should be_true # make sure IO is running parallel
         session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure sessions were created
-        
       end
     end
   end
