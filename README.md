@@ -81,11 +81,13 @@ seperate pools for your various domains based on URI. Options are passed to the 
     end
 
 ## Sessions without Pool
-If you have a client that is thread safe but does not support sessions you can implement sessions similarly.
-
+If you have a client that is thread safe but does not support sessions you can implement sessions similarly. Excon
+is thread safe but you are using a single client, so you may loose preformance with multithreading.
+    
+    require 'excon'
     class MyClass
       # Our client block must accept the url argument
-      @@sessons = HotTub::Sessions.new(:with_pool => false) {|url| MyThreadSafeLib.new(url) }
+      @@sessons = HotTub::Sessions.new(:with_pool => false) {|url| Excon.new(url) }
       def async_post_results(query = {})
         @@sessons.run("http://somewebservice.com") do |connection|    
           puts connection.get(:query => results).response_header.status
