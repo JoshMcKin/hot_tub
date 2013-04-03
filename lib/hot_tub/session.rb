@@ -2,7 +2,7 @@ require 'uri'
 module HotTub
   class Session
 
-    # A HotTub::Session is a synchronized hash used to separate HotTub::Pools by their domain.
+    # A HotTub::Session is a synchronized hash used to separate pools/clients by their domain.
     # Excon and EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to
     # manage multiple pools like when a process need to connect to various AWS resources.
     # Example:
@@ -31,10 +31,9 @@ module HotTub
     #   sessions.run("https://wwww.google.com") do |conn|
     #     p conn.head.response_header.status # => create separate pool for "https://wwww.google.com"
     #   end
-    def initialize(options={},&client_block)
+    def initialize(&client_block)
       raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
       @client_block = client_block
-      @options = options || {} 
       @sessions = Hash.new
       @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
     end
@@ -42,6 +41,21 @@ module HotTub
     # Synchronize access to our key hash
     # expects a url string or URI
     def sessions(url)
+      key = to_key(url)
+      return @sessions[key] if @sessions[key]
+      @mutex.synchronize do
+        @sessions[key] ||= @client_block.call(url)
+      end
+    end
+
+    # call on session
+    def run(url,&block)
+      block.call(sessions(url))
+    end
+
+    private
+
+    def to_key(url)
       if url.is_a?(String)
         uri = URI(url)
       elsif url.is_a?(URI)
@@ -49,17 +63,7 @@ module HotTub
       else
         raise ArgumentError, "you must pass a string or a URI object"
       end
-      key = "#{uri.scheme}-#{uri.host}"
-      return @sessions[key] if @sessions[key]
-      @mutex.synchronize do
-        @sessions[key] ||= HotTub::Pool.new(@options) { @client_block.call(url) }
-      end
-    end
-
-    # Hand off to pool.run
-    def run(url,&block)
-      pool = sessions(url)
-      pool.run(&block) if pool
+      "#{uri.scheme}-#{uri.host}"
     end
   end
 end

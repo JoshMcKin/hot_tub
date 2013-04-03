@@ -1,87 +1,111 @@
 require 'spec_helper'
 require 'hot_tub/session'
 require 'uri'
+require 'time'
 describe HotTub::Session do
 
-  it "should raise error if block is not supplied" do
-    lambda {HotTub::Session.new}.should raise_error(ArgumentError)
+  context 'initialized without a block' do
+    it "should raise error if block is not supplied" do
+      lambda {HotTub::Session.new}.should raise_error(ArgumentError)
+    end
   end
-
-  describe '#sessions' do
+  context 'initialized with a block' do
     before(:each) do
-      @url = "https://www.google.com"
+      @url = "https://www.somewebsite.com"
       @uri = URI(@url)
-      @tub = HotTub::Session.new({:size => 21, :never_block => false}) { |url| MocClient.new(url) }
-    end
-    
-    it "should add a new pool for the url" do
-      @tub.sessions(@url)
-      sessions = @tub.instance_variable_get(:@sessions)
-      sessions.length.should eql(1)
-      sessions.first[1].should be_a(HotTub::Pool)
+      @sessions = HotTub::Session.new { |url| MocClient.new(url) }
     end
 
-    context "passed URL string" do
-      it "should set key with URI scheme-domain" do
-        @tub.sessions(@url)
-        sessions = @tub.instance_variable_get(:@sessions)
-        sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(HotTub::Pool)
+    describe '#to_url' do
+      context "passed URL string" do
+        it "should return key with URI scheme-domain" do
+          @sessions.send(:to_key,@url).should eql("#{@uri.scheme}-#{@uri.host}")
+        end
+      end
+
+      context "passed URI" do
+        it "should return key with URI scheme-domain" do
+          @sessions.send(:to_key,@uri).should eql("#{@uri.scheme}-#{@uri.host}")
+        end
+      end
+
+      context "invalid argument" do
+        it "should raise an ArgumentError" do
+          lambda { @sessions.send(:to_key, nil) }.should raise_error(ArgumentError)
+        end
+        it  "should raise URI::InvalidURIError with bad url" do
+          lambda { @sessions.send(:to_key,"bad url") }.should raise_error(URI::InvalidURIError)
+        end
       end
     end
 
-    context "passed URI" do
-      it "should set key with URI scheme-domain" do
-        @tub.sessions(@uri)
-        sessions = @tub.instance_variable_get(:@sessions)
-        sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(HotTub::Pool)
+    describe '#sessions' do
+      it "should add a new pool for the url" do
+        @sessions.sessions(@url)
+        sessions = @sessions.instance_variable_get(:@sessions)
+        sessions.length.should eql(1)
+        sessions.first[1].should be_a(MocClient)
+      end
+
+      context "passed URL string" do
+        it "should set key with URI scheme-domain" do
+          @sessions.sessions(@url)
+          sessions = @sessions.instance_variable_get(:@sessions)
+          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
+        end
+      end
+      context "passed URI" do
+        it "should set key with URI scheme-domain" do
+          @sessions.sessions(@uri)
+          sessions = @sessions.instance_variable_get(:@sessions)
+          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
+        end
       end
     end
 
-    context "invalid argument" do
-      it "should raise an ArgumentError" do
-        lambda { @tub.sessions(nil) }.should raise_error(ArgumentError)
-
-      end
-      it  "should raise URI::InvalidURIError with bad url" do
-        lambda { @tub.sessions("bad url") }.should raise_error(URI::InvalidURIError)
+    describe '#run' do
+      it "should work" do
+        @url = "https://www.somewebsite.com"
+        @sessions = HotTub::Session.new { |url| MocClient.new(url) }
+        result = nil
+        @sessions.run(@url) do |conn|
+          result = conn.get
+        end
+        result.should_not be_nil
       end
     end
-  end
-  describe '#run' do
-    it "should work" do
-      @url = "https://www.google.com"
-      @tub = HotTub::Session.new({:size => 21, :never_block => false}) { |url| Excon.new(@url) }
-      status = 0
-      @tub.run(@url) do |conn|
-        status =  conn.head.status
-      end
-      status.should eql(200)
-    end
-  end
 
-  context 'thread safety' do
-    it "should work" do
-      url = "https://www.google.com/"
-      url2 = "http://www.yahoo.com/"
-      session = HotTub::Session.new({:size => 10}) { |url| Excon.new(url)}
-      failed = false
-      lambda {
+    context 'thread safety' do
+      it "should work" do
+        url = "https://www.somewebsite.com/"
+        url2 = "http://www.someotherwebsit.com/"
+        session = HotTub::Session.new { |url| MocClient.new(url)}
+        failed = false
+        start_time = Time.now
+        stop_time = nil
+        mutex = Mutex.new
         threads = []
-        20.times.each do
-          threads << Thread.new do
-            session.run(url){|connection| failed = true unless connection.head.status == 200}
-            session.run(url2){|connection| failed = true unless connection.head.status == 200}
+        lambda {
+          10.times.each do
+            threads << Thread.new do
+              # MocClient is not thread safe so lets initialize a new instance for each
+              session.run(url)  { |clnt| Thread.current[:result] = MocClient.new(url).get }
+              session.run(url2) { |clnt| Thread.current[:result] = MocClient.new(url2).get }
+            end
           end
-        end
-        sleep(0.01)
-        threads.each do |t|
-          t.join
-        end
-      }.should_not raise_error
-      session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure work got done
-      session.instance_variable_get(:@sessions).values.first.instance_variable_get(:@pool).length.should eql(10) # make sure work got done
-      session.instance_variable_get(:@sessions).values.last.instance_variable_get(:@pool).length.should eql(10) # make sure work got done
-      failed.should be_false # Make sure our requests woked
+          threads.each do |t|
+            t.join
+          end
+          stop_time = Time.now
+        }.should_not raise_error # make sure we're thread safe
+        # Some extra checks just to make sure...
+        results = threads.collect{ |t| t[:result]}
+        results.length.should eql(10) # make sure all threads are present
+        results.uniq.should eql([results.first]) # make sure we got the same results
+        ((stop_time.to_i - start_time.to_i) < (results.length * MocClient.sleep_time)).should be_true # make sure IO is running parallel
+        session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure sessions were created
+        
+      end
     end
   end
 end

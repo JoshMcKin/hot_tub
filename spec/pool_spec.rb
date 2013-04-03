@@ -11,7 +11,7 @@ describe HotTub::Pool do
     end
 
     it "should have :size of 5" do
-      @pool.instance_variable_get(:@options)[:size].should eql(5) 
+      @pool.instance_variable_get(:@options)[:size].should eql(5)
     end
 
     it "should have :blocking_timeout of 0.5" do
@@ -47,7 +47,7 @@ describe HotTub::Pool do
 
   describe '#run' do
     before(:each) do
-      @pool = HotTub::Pool.new { Excon.new('https://www.google.com')}
+      @pool = HotTub::Pool.new { MocClient.new}
     end
 
     it "should remove connection from pool when doing work" do
@@ -66,17 +66,9 @@ describe HotTub::Pool do
     end
 
     it "should work" do
-      status = 0
-      @pool.run{|clnt| status = clnt.head.status}
-      status.should eql(200)
-    end
-
-    context "block given" do
-      it "should call the supplied block" do
-        status = nil
-        @pool.run { |con| status = con.get.status}
-        status.should_not be_nil
-      end
+      result = nil
+      @pool.run{|clnt| result = clnt.get}
+      result.should_not be_nil
     end
 
     context 'block not given' do
@@ -107,7 +99,7 @@ describe HotTub::Pool do
   context 'private methods' do
     before(:each) do
       @url = "http://www.testurl123.com/"
-      @pool = HotTub::Pool.new { Excon.new(@url)}
+      @pool = HotTub::Pool.new { MocClient.new}
     end
 
     describe '#client' do
@@ -117,8 +109,8 @@ describe HotTub::Pool do
         lambda { puts @pool.send(:client) }.should raise_error(HotTub::BlockingTimeout)
       end
 
-      it "should return an instance of the driver" do
-        @pool.send(:client).should be_instance_of(Excon::Connection)
+      it "should return an instance of the client" do
+        @pool.send(:client).should be_instance_of(MocClient)
       end
     end
 
@@ -147,13 +139,13 @@ describe HotTub::Pool do
   context 'thread safety' do
     it "should work" do
       url = "https://www.google.com/"
-      pool = HotTub::Pool.new({:size => 10}) { Excon.new(url) }
+      pool = HotTub::Pool.new({:size => 10}) { MocClient.new }
       failed = false
       lambda {
         threads = []
         20.times.each do
           threads << Thread.new do
-            pool.run{|connection| failed = true unless connection.get.status == 200}
+            pool.run{|connection| connection.get }
           end
         end
         sleep(0.01)
@@ -162,19 +154,50 @@ describe HotTub::Pool do
         end
       }.should_not raise_error
       pool.instance_variable_get(:@pool).length.should eql(10) # make sure work got done
-      failed.should be_false # Make sure our requests woked
     end
   end
 
   context "other http client" do
     before(:each) do
-      @url = "https://www.google.com"
-      @pool = HotTub::Pool.new(:clean => lambda {|clnt| clnt.clean}) {MocClient.new(@url)}
+      @pool = HotTub::Pool.new(:clean => lambda {|clnt| clnt.clean}) {MocClient.new}
     end
 
     it "should clean connections" do
       @pool.run  do |clnt|
         clnt.cleaned?.should be_true
+      end
+    end
+  end
+
+  context 'Excon' do
+    before(:each) do
+      @pool = HotTub::Pool.new(:size => 10) { Excon.new('https://www.google.com')}
+    end
+    it "should work" do
+      result = nil
+      @pool.run{|clnt| result = clnt.head.status}
+      result.should eql(200)
+    end
+    context 'threads' do
+      it "should work" do
+        url = "https://www.google.com/"
+        failed = false
+        threads = []
+        lambda {
+          20.times.each do
+            threads << Thread.new do
+              @pool.run{|connection| Thread.current[:status] = connection.head.status }
+            end
+          end
+          sleep(0.01)
+          threads.each do |t|
+            t.join
+          end
+        }.should_not raise_error
+        @pool.instance_variable_get(:@pool).length.should eql(10) # make sure work got done
+        results = threads.collect{ |t| t[:status]}
+        results.length.should eql(20) # make sure all threads are present
+        results.uniq.should eql([200]) # make sure all returned status 200
       end
     end
   end

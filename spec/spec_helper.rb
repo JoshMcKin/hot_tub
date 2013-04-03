@@ -18,23 +18,30 @@ class MocClient
     @clean = false
   end
 
+  # Perform an IO
   def get
-      sleep(0.05)
+    return `sleep #{self.class.sleep_time}; echo "that was slow IO"`
   end
 
   def close
-  	@close = true
+    @close = true
   end
 
   def closed?
-  	@close == true
+    @close == true
   end
 
   def clean
-  	@clean = true
+    @clean = true
   end
 
   def cleaned?
-  	@clean == true
+    @clean == true
+  end
+
+  class << self
+    def sleep_time
+      0.5
+    end
   end
 end
