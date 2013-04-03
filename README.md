@@ -64,12 +64,12 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
 ## Sessions with Pool
 Not all clients have a sessions feature, Excon and Em-Http-Request clients are initialized to a single domain and while you
 can change paths the client domain cannot change. HotTub::Session allows you create a session object that initializes
-seperate pools for your various domains based on URI.
+seperate pools for your various domains based on URI. Options are passed to the pool when each pool is initialized.
 
     require 'excon'
     class MyClass
       # Our client block must accept the url argument
-      @@sessons = HotTub::Sessions.new {|url| { Excon.new(url) } 
+      @@sessons = HotTub::Sessions.new(:size => 10) {|url| { Excon.new(url) } 
       def async_post_results(query = {})
         @@sessons.run("http://somewebservice.com") do |connection|    
           puts connection.run(:query => results).response_header.status
