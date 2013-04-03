@@ -14,6 +14,8 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "hot_tub"
   s.add_development_dependency "rspec"
+  s.add_development_dependency "sinatra"
+  s.add_development_dependency "puma"
   
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
