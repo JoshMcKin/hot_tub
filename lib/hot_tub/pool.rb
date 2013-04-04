@@ -37,7 +37,7 @@ module HotTub
       }.merge(options)
       @pool = []
       @current_size = 0
-      @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @mutex = (HotTub.em_synchrony? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
       @last_activity = Time.now
       @fetching_client = false
     end
