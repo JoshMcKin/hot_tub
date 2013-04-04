@@ -215,7 +215,7 @@ describe HotTub::Pool do
     end
   end
 
-  context 'Excon' do
+  context 'Excon' do # Excon has its own pool, but just need to test with a real non-EM library
     before(:each) do
       @pool = HotTub::Pool.new(:size => 10) { Excon.new(HotTub::Server.url)}
     end

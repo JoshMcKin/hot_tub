@@ -6,6 +6,8 @@ module HotTub
     def self.run
       @events = Puma::Events.new STDOUT, STDERR
       @server = Puma::Server.new HotTub::Server.new, @events
+      @server.min_threads = 10
+      @server.max_threads = 200
       @server.add_tcp_listener '127.0.0.1', 9595
       @server.run
     end

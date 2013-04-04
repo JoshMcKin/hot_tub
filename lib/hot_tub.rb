@@ -1,7 +1,7 @@
 require 'thread'
-require 'timeout'
 require 'logger'
 require "hot_tub/version"
+require "hot_tub/known_clients"
 require "hot_tub/pool"
 require "hot_tub/session"
 

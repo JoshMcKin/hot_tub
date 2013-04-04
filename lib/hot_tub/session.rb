@@ -1,13 +1,26 @@
 require 'uri'
 module HotTub
   class Session
-
+    include HotTub::KnownClients
     # A HotTub::Session is a synchronized hash used to separate pools/clients by their domain.
     # Excon and EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to
-    # manage multiple pools like when a process need to connect to various AWS resources.
+    # manage multiple pools like when a process need to connect to various AWS resources. You can use any client
+    # you choose, but make sure you client is threadsafe.
     # Example:
     #
-    #   sessions = HotTub::Session.new(:client_options => {:connect_timeout => 10}) { |url| Excon.new(url) }
+    #   sessions = HotTub::Session.new { |url| Excon.new(url) }
+    #
+    #   sessions.run("http://wwww.yahoo.com") do |conn|
+    #     p conn.head.status
+    #   end
+    #
+    #   sessions.run("https://wwww.google.com") do |conn|
+    #     p conn.head.status
+    #   end
+    #
+    # Example with Pool:
+    #
+    #   sessions = HotTub::Pool.new(:size => 12) { EM::HttpRequest.new("http://somewebservice.com") }
     #
     #   sessions.run("http://wwww.yahoo.com") do |conn|
     #     p conn.head.response_header.status
@@ -17,23 +30,10 @@ module HotTub
     #     p conn.head.response_header.status
     #   end
     #
-    # Other client classes
-    # If you have your own client class you can use sessions but your client class must initialize similar to
-    # EmHttpRequest, accepting a URI and options see: hot_tub/clients/em_http_request_client.rb
-    # Example Custom Client:
-    #
-    #   sessions = HotTub::Session.new({:never_block => false})  { |url| Excon.new(url) }
-    #
-    #   sessions.run("https://wwww.yahoo.com") do |conn|
-    #     p conn.head.response_header.status # => create pool for "https://wwww.yahoo.com"
-    #   end
-    #
-    #   sessions.run("https://wwww.google.com") do |conn|
-    #     p conn.head.response_header.status # => create separate pool for "https://wwww.google.com"
-    #   end
     def initialize(options={},&client_block)
       raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
-      @options = {:with_pool => true}.merge(options)
+      at_exit { close_all } # close connections at exit
+      @options = options || {}
       @client_block = client_block
       @sessions = Hash.new
       @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
@@ -45,18 +45,33 @@ module HotTub
       key = to_key(url)
       return @sessions[key] if @sessions[key]
       @mutex.synchronize do
-        if @options[:with_pool]
-          @sessions[key] ||= HotTub::Pool.new(@options) { @client_block.call(url) } 
-        else
-          @sessions[key] ||= @client_block.call(url)
-        end
+        @sessions[key] = @client_block.call(url) if @sessions[key].nil?
+        @sessions[key]
       end
     end
 
     def run(url,&block)
       session = sessions(url)
-      return session.run(&block) if @options[:with_pool]
+      return session.run(&block) if session.is_a?(HotTub)
       block.call(sessions(url))
+    end
+
+    # Calls close on all pools/clients in sessions
+    def close_all
+      @sessions.each do |key,clnt|
+        if clnt.is_a?(HotTub::Pool)
+          clnt.close_all
+        else
+          begin
+            close_client(clnt)
+          rescue => e
+            HotTub.logger.error "There was an error close one of your HotTub::Session clients: #{e}"
+          end
+        end
+        @mutex.synchronize do
+          @sessions[key] = nil
+        end
+      end
     end
 
     private
