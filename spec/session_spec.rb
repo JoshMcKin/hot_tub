@@ -94,9 +94,9 @@ describe HotTub::Session do
 
     context 'threads' do
       it "should work" do
-        url = "https://www.somewebsite.com/"
-        url2 = "http://www.someotherwebsit.com/"
-        session = HotTub::Session.new { |url| MocClient.new(url)}
+        url = HotTub::Server.url
+        url2 = "http://www.yahoo.com/"
+        session = HotTub::Session.new { |url| Excon.new(url)}
         failed = false
         start_time = Time.now
         stop_time = nil

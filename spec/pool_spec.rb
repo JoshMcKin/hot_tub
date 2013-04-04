@@ -226,7 +226,6 @@ describe HotTub::Pool do
     end
     context 'threads' do
       it "should work" do
-        url = "https://www.google.com/"
         failed = false
         threads = []
         lambda {
