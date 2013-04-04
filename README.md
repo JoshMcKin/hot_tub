@@ -58,7 +58,7 @@ seperate pools for your various domains based on URI. Options are passed to the 
     require "em-synchrony"
     require "em-synchrony/em-http"
     # Our client block must accept the url argument
-    sessons = HotTub::Pool.new(:size => 12) { EM::HttpRequest.new("http://somewebservice.com") }
+    sessons = HotTub::Pool.new(:size => 12) { |url| EM::HttpRequest.new(url) }
     sessons.run("http://somewebservice.com") do |clnt|    
       puts clnt.get(:query => results).response_header.status
     end
