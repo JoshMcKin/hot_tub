@@ -5,7 +5,6 @@ gemspec
 gem 'rake'
 
 group :development do
-	gem 'excon'
   platform :ruby do
     gem 'eventmachine'
     gem 'em-http-request', '~> 1.0', :require => 'em-http'
