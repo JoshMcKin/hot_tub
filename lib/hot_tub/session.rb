@@ -52,7 +52,7 @@ module HotTub
 
     def run(url,&block)
       session = sessions(url)
-      return session.run(&block) if session.is_a?(HotTub)
+      return session.run(&block) if session.is_a?(HotTub::Pool)
       block.call(sessions(url))
     end
 

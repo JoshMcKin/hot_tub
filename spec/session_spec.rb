@@ -2,6 +2,10 @@ require 'spec_helper'
 require 'hot_tub/session'
 require 'uri'
 require 'time'
+unless HotTub.jruby?
+  require "em-synchrony"
+  require "em-synchrony/em-http"
+end
 describe HotTub::Session do
 
   context 'initialized without a block' do
@@ -88,7 +92,7 @@ describe HotTub::Session do
       end
     end
 
-    context 'thread safety' do
+    context 'threads' do
       it "should work" do
         url = "https://www.somewebsite.com/"
         url2 = "http://www.someotherwebsit.com/"
@@ -117,6 +121,46 @@ describe HotTub::Session do
         results.uniq.should eql([results.first]) # make sure we got the same results
         ((stop_time.to_i - start_time.to_i) < (results.length * MocClient.sleep_time)).should be_true # make sure IO is running parallel
         session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure sessions were created
+      end
+    end
+
+    unless HotTub.jruby?
+      context 'fibers' do
+        it "should work" do
+          EM.synchrony do
+            sessions = HotTub::Session.new {|url| HotTub::Pool.new({:size => 5}) {EM::HttpRequest.new(url)}}
+            failed = false
+            fibers = []
+            lambda {
+              10.times.each do
+                fibers << Fiber.new do
+                  sessions.run(@url) {|connection|
+                    s = connection.head(:keepalive => true).response_header.status
+                  failed = true unless s == 200}
+                end
+              end
+              fibers.each do |f|
+                f.resume
+              end
+              loop do
+                done = true
+                fibers.each do |f|
+                  done = false if f.alive?
+                end
+                if done
+                  break
+                else
+                  EM::Synchrony.sleep(0.01)
+                end
+              end
+            }.should_not raise_error
+            sessions.instance_variable_get(:@sessions).keys.length.should eql(1)
+            (sessions.sessions(@url).instance_variable_get(:@pool).length >= 5).should be_true #make sure work got done
+            failed.should be_false # Make sure our requests worked
+            sessions.close_all
+            EM.stop
+          end
+        end
       end
     end
   end
