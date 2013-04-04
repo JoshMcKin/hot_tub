@@ -19,6 +19,10 @@ module HotTub
     (defined?(EM) && EM::reactor_running?)
   end
 
+  def self.em_synchrony?
+    (self.em? && defined?(EM::Synchrony))
+  end
+
   def self.jruby?
     (defined?(JRUBY_VERSION))
   end

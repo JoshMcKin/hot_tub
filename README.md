@@ -39,11 +39,11 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
     
     HotTub.logger = Rails.logger
 
-## Usage 
+# Usage 
 
 ## HotTub::Pool
 
-### EM-Http-Request 
+### EM-Http-Request
     require 'hot_tub'
     require 'em-synchrony'
     require 'em-synchrony/em-http'
@@ -61,7 +61,7 @@ Close and clean can be defined at initialization with lambdas, if they are not d
     pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
     pool.run { |clnt| clnt.get(@@url,query).body }
  
-## HotTub::Sessions
+## HotTub::Sessions Usage 
 HotTub::Sessions are a synchronized hash of clients/pools and are implemented similar HotTub::Pool. 
 For example, Excon is thread safe but you set a single url at the client level so sessions 
 are handy if you need to access multiple urls but would prefer a single object.

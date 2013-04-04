@@ -36,7 +36,7 @@ module HotTub
       @options = options || {}
       @client_block = client_block
       @sessions = Hash.new
-      @mutex = (HotTub.em? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @mutex = (HotTub.em_synchrony? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
     end
 
     # Synchronizes initialization of our sessions
