@@ -69,7 +69,7 @@ are handy if you need to access multiple urls but would prefer a single object.
     require 'hot_tub'
     require 'excon'
     # Our client block must accept the url argument
-    sessions = HotTub::Sessions.new(:pool => false) {|url| Excon.new(url) }
+    sessions = HotTub::Sessions.new {|url| Excon.new(url) }
 
     sessions.run("http://somewebservice.com") do |clnt|    
       puts clnt.get(:query => {:some => 'stuff'}).response_header.status
@@ -90,7 +90,7 @@ Suppose you have a client that is not thread safe, you can use HotTub::Pool with
     # Our client block must accept the url argument
 
     EM.synchrony do {
-      sessions = HotTub::Pool.new(:size => 12) { |url| EM::HttpRequest.new(url) }
+      sessions = HotTub::Sessions.new {|url| HotTub::Pool.new(:size => 12) { EM::HttpRequest.new(url, :inactivity_timeout => 0) }}
 
       sessions.run("http://somewebservice.com") do |clnt|    
         puts clnt.get(:query => results).response_header.status
