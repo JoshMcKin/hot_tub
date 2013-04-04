@@ -16,7 +16,7 @@ module HotTub
     set :port, 9595
 
     get '/data/:amount' do |amount|
-      'x' * amount.to_i
+      (('x' * amount.to_i ) << Random.new.rand(0..999999).to_s)
     end
 
     def self.teardown

@@ -275,6 +275,7 @@ describe HotTub::Pool do
           c.run { |conn| status << conn.ahead(:keepalive => true).response_header.status}
           c.run { |conn| status << conn.head(:keepalive => true).response_header.status}
           status.should eql([200,0,200])
+          c.close_all
           EM.stop
         end
       end
@@ -282,7 +283,6 @@ describe HotTub::Pool do
       context 'fibers' do
         it "should work" do
           EM.synchrony do
-            url = HotTub::Server.url
             pool = HotTub::Pool.new({:size => 5}) {EM::HttpRequest.new(@url)}
             failed = false
             fibers = []
@@ -311,6 +311,7 @@ describe HotTub::Pool do
             }.should_not raise_error
             (pool.instance_variable_get(:@pool).length >= 5).should be_true #make sure work got done
             failed.should be_false # Make sure our requests worked
+            pool.close_all
             EM.stop
           end
         end
