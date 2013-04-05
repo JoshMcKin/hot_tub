@@ -261,6 +261,32 @@ describe HotTub::Pool do
   end
 
   unless HotTub.jruby?
+    describe "fiber_mutex?" do
+        context 'EM::HttpRequest as client' do
+          before(:each) do
+            @pool = HotTub::Pool.new { EM::HttpRequest.new(HotTub::Server.url) }
+          end
+          context "EM::Synchrony is present" do
+            it "should be true" do
+              HotTub.stub(:em_synchrony?).and_return(true)
+              @pool.send(:fiber_mutex?).should be_true
+            end
+          end
+          context "EM::Synchrony is not present" do
+            it "should be false" do
+              HotTub.stub(:em_synchrony?).and_return(false)
+              @pool.send(:fiber_mutex?).should be_false
+            end
+          end
+        end
+        context 'client is not EM::HttpRequest' do
+          it "should be false" do
+            pool = HotTub::Pool.new {|url| MocClient.new}
+            pool.send(:fiber_mutex?).should be_false
+          end
+        end
+      end
+
     context 'EM:HTTPRequest' do
       before(:each) do
         @url = HotTub::Server.url
@@ -269,7 +295,7 @@ describe HotTub::Pool do
       it "should work" do
         EM.synchrony do
           status = []
-          c = HotTub::Pool.new {EM::HttpRequest.new(@url)}
+          c = HotTub::Pool.new(:fiber_mutex => true) {EM::HttpRequest.new(@url)}
           c.run { |conn| status << conn.head(:keepalive => true).response_header.status}
           c.run { |conn| status << conn.ahead(:keepalive => true).response_header.status}
           c.run { |conn| status << conn.head(:keepalive => true).response_header.status}
@@ -282,15 +308,15 @@ describe HotTub::Pool do
       context 'fibers' do
         it "should work" do
           EM.synchrony do
-            pool = HotTub::Pool.new({:size => 5}) {EM::HttpRequest.new(@url)}
+            pool = HotTub::Pool.new({:size => 5, :fiber_mutex => true}) {EM::HttpRequest.new(@url)}
             failed = false
             fibers = []
             lambda {
               10.times.each do
                 fibers << Fiber.new do
-                  pool.run{|connection| 
+                  pool.run{|connection|
                     s = connection.head(:keepalive => true).response_header.status
-                    failed = true unless s == 200}
+                  failed = true unless s == 200}
                 end
               end
               fibers.each do |f|

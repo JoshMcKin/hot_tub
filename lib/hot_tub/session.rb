@@ -37,7 +37,7 @@ module HotTub
       @options = options || {}
       @client_block = client_block
       @sessions = Hash.new
-      @mutex = (HotTub.em_synchrony? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @mutex = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
     end
 
     # Synchronizes initialization of our sessions
@@ -80,6 +80,14 @@ module HotTub
     end
 
     private
+
+    def fiber_mutex?
+      begin
+        (HotTub.em_synchrony? && @client_block.call("http://moc").is_a?(EventMachine::HttpConnection))
+      rescue
+        false
+      end
+    end
 
     def to_key(url)
       if url.is_a?(String)

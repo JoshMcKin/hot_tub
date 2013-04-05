@@ -145,10 +145,38 @@ describe HotTub::Session do
     end
 
     unless HotTub.jruby?
+
+      describe "fiber_mutex?" do
+
+        context 'EM::HttpRequest as client' do
+          before(:each) do
+            @session = HotTub::Session.new {|url| EM::HttpRequest.new(url)}
+          end
+          context "EM::Synchrony is present" do
+            it "should be true" do
+              HotTub.stub(:em_synchrony?).and_return(true)
+              @session.send(:fiber_mutex?).should be_true
+            end
+          end
+          context "EM::Synchrony is not present" do
+            it "should be false" do
+              HotTub.stub(:em_synchrony?).and_return(false)
+              @session.send(:fiber_mutex?).should be_false
+            end
+          end
+        end
+        context 'client is not EM::HttpRequest' do
+          it "should be false" do
+            session = HotTub::Session.new {|url| MocClient.new}
+            session.send(:fiber_mutex?).should be_false
+          end
+        end
+      end
+
       context 'fibers' do
         it "should work" do
           EM.synchrony do
-            sessions = HotTub::Session.new {|url| HotTub::Pool.new({:size => 5}) {EM::HttpRequest.new(url)}}
+            sessions = HotTub::Session.new(:with_pool => true) {|url| EM::HttpRequest.new(url)}
             failed = false
             fibers = []
             lambda {

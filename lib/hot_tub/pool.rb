@@ -2,7 +2,7 @@ module HotTub
   class Pool
     include HotTub::KnownClients
     attr_reader :current_size, :fetching_client, :last_activity
-    
+
     # Thread-safe lazy connection pool
     #
     # == Example EM-Http-Request
@@ -11,8 +11,8 @@ module HotTub
     #
     # HotTub::Pool defaults never_block to true, which means if we run out of
     # connections simply create a new client to continue operations.
-    # The pool will grow and extra connections will be resued until activity dies down. 
-    # If you would like to block and possibly throw an exception rather than temporarily 
+    # The pool will grow and extra connections will be resued until activity dies down.
+    # If you would like to block and possibly throw an exception rather than temporarily
     # grow the set :size, set :never_block to false; blocking_timeout defaults to 10 seconds.
     #
     # == Example without #never_block (will BlockingTimeout exception)
@@ -37,7 +37,7 @@ module HotTub
       }.merge(options)
       @pool = []
       @current_size = 0
-      @mutex = (HotTub.em_synchrony? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @mutex = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
       @last_activity = Time.now
       @fetching_client = false
     end
@@ -69,6 +69,14 @@ module HotTub
     end
 
     private
+
+    def fiber_mutex?
+      begin
+        (HotTub.em_synchrony? && @client_block.call.is_a?(EventMachine::HttpConnection))
+      rescue
+        false
+      end
+    end
 
     # Returns an instance of the client for this pool.
     def client
@@ -110,7 +118,7 @@ module HotTub
         @fetching_client = false
         clnt
       end
-    ensure 
+    ensure
       reap_pool if reap_pool?
     end
 
