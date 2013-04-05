@@ -15,8 +15,10 @@ HotTub.logger.level = Logger::ERROR
 RSpec.configure do |config|
  config.before(:suite) do
   HotTub::Server.run
+  HotTub::Server2.run
  end
  config.after(:suite) do
   HotTub::Server.teardown
+  HotTub::Server2.teardown
  end
 end

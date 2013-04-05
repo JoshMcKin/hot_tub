@@ -23,13 +23,13 @@ describe HotTub::Session do
     describe '#to_url' do
       context "passed URL string" do
         it "should return key with URI scheme-domain" do
-          @sessions.send(:to_key,@url).should eql("#{@uri.scheme}-#{@uri.host}")
+          @sessions.send(:to_key,@url).should eql("#{@uri.scheme}://#{@uri.host}:#{@uri.port}")
         end
       end
 
       context "passed URI" do
         it "should return key with URI scheme-domain" do
-          @sessions.send(:to_key,@uri).should eql("#{@uri.scheme}-#{@uri.host}")
+          @sessions.send(:to_key,@uri).should eql("#{@uri.scheme}://#{@uri.host}:#{@uri.port}")
         end
       end
 
@@ -68,14 +68,14 @@ describe HotTub::Session do
         it "should set key with URI scheme-domain" do
           @sessions.sessions(@url)
           sessions = @sessions.instance_variable_get(:@sessions)
-          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
+          sessions["#{@uri.scheme}://#{@uri.host}:#{@uri.port}"].should be_a(MocClient)
         end
       end
       context "passed URI" do
         it "should set key with URI scheme-domain" do
           @sessions.sessions(@uri)
           sessions = @sessions.instance_variable_get(:@sessions)
-          sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
+          sessions["#{@uri.scheme}://#{@uri.host}:#{@uri.port}"].should be_a(MocClient)
         end
       end
 
@@ -115,8 +115,8 @@ describe HotTub::Session do
     context 'threads' do
       it "should work" do
         url = HotTub::Server.url
-        url2 = "http://www.yahoo.com/"
-        session = HotTub::Session.new { |url| Excon.new(url)}
+        url2 = HotTub::Server2.url
+        session = HotTub::Session.new(:with_pool => true) { |url| Excon.new(url)}
         failed = false
         start_time = Time.now
         stop_time = nil
@@ -127,7 +127,7 @@ describe HotTub::Session do
             threads << Thread.new do
               # MocClient is not thread safe so lets initialize a new instance for each
               session.run(url)  { |clnt| Thread.current[:result] = clnt.get.status }
-              session.run(url2) { |clnt| Thread.current[:result] = clnt.head.status }
+              session.run(url2) { |clnt| Thread.current[:result] = clnt.get.status }
             end
           end
           threads.each do |t|

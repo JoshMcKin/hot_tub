@@ -89,7 +89,7 @@ module HotTub
       else
         raise ArgumentError, "you must pass a string or a URI object"
       end
-      "#{uri.scheme}-#{uri.host}"
+      "#{uri.scheme}://#{uri.host}:#{uri.port}"
     end
   end
 end
