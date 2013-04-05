@@ -78,17 +78,37 @@ describe HotTub::Session do
           sessions["#{@uri.scheme}-#{@uri.host}"].should be_a(MocClient)
         end
       end
+
+      context "with_pool" do
+        it "should initialize a new HotTub::Pool" do
+          session_with_pool = HotTub::Session.new({:with_pool => true})  { |url| MocClient.new(url) }
+          pool = session_with_pool.sessions(@url)
+          pool.should be_a(HotTub::Pool)
+        end
+      end
     end
 
     describe '#run' do
       it "should work" do
-        @url = "https://www.somewebsite.com"
-        @sessions = HotTub::Session.new { |url| MocClient.new(url) }
+        url = HotTub::Server.url
+        sessions = HotTub::Session.new { |url| Excon.new(url) }
         result = nil
-        @sessions.run(@url) do |conn|
-          result = conn.get
+        sessions.run(url) do |conn|
+          result = conn.get.status
         end
-        result.should_not be_nil
+        result.should eql(200)
+      end
+
+      context "with_pool" do
+        it "should pass run to pool" do
+          url = HotTub::Server.url
+          session_with_pool = HotTub::Session.new({:with_pool => true})  { |url| Excon.new(url) }
+          result = nil
+          session_with_pool.run(url) do |conn|
+            result = conn.get.status
+          end
+          result.should eql(200)
+        end
       end
     end
 
@@ -106,8 +126,8 @@ describe HotTub::Session do
           10.times.each do
             threads << Thread.new do
               # MocClient is not thread safe so lets initialize a new instance for each
-              session.run(url)  { |clnt| Thread.current[:result] = MocClient.new(url).get }
-              session.run(url2) { |clnt| Thread.current[:result] = MocClient.new(url2).get }
+              session.run(url)  { |clnt| Thread.current[:result] = clnt.get.status }
+              session.run(url2) { |clnt| Thread.current[:result] = clnt.head.status }
             end
           end
           threads.each do |t|

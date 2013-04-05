@@ -90,7 +90,7 @@ Suppose you have a client that is not thread safe, you can use HotTub::Pool with
     # Our client block must accept the url argument
 
     EM.synchrony do {
-      sessions = HotTub::Sessions.new {|url| HotTub::Pool.new(:size => 12) { EM::HttpRequest.new(url, :inactivity_timeout => 0) }}
+      sessions = HotTub::Sessions.new(:with_pool => true, :size => 12) {|url| EM::HttpRequest.new(url, :inactivity_timeout => 0) }
 
       sessions.run("http://somewebservice.com") do |clnt|    
         puts clnt.get(:query => results).response_header.status

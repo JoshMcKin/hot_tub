@@ -144,7 +144,7 @@ describe HotTub::Pool do
             pool.run{|connection| connection.get }
           end
         end
-        sleep(0.01)
+        sleep(1)
         threads.each do |t|
           t.join
         end
@@ -155,12 +155,12 @@ describe HotTub::Pool do
       it "should not add connections to pool beyond specified size" do
         pool = HotTub::Pool.new({:size => 1, :never_block => false, :blocking_timeout => 10}) { MocClient.new }
         threads = []
-        3.times.each do
+        2.times.each do
           threads << Thread.new do
             pool.run{|connection| connection.get }
           end
         end
-        sleep(0.01)
+        sleep(1)
         threads.each do |t|
           t.join
         end
