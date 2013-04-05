@@ -13,7 +13,7 @@ There are a couple Ruby connection pooling libraries out there but HotTub differ
 * Set to expand pool under load that is eventually reaped back down to set size (never_block), can be disabled
 * Attempts to close clients/connections at_exit
 
-### HotTub::Sessions
+### HotTub::Session
 * Thread safe
 * The same api as HotTub::Pool
 * Can be used with HotTub::Pool or any client library 
@@ -61,7 +61,7 @@ Close and clean can be defined at initialization with lambdas, if they are not d
     pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
     pool.run { |clnt| clnt.get(@@url,query).body }
  
-## HotTub::Sessions Usage 
+## HotTub::Session Usage 
 HotTub::Sessions are a synchronized hash of clients/pools and are implemented similar HotTub::Pool. 
 For example, Excon is thread safe but you set a single url at the client level so sessions 
 are handy if you need to access multiple urls but would prefer a single object.
@@ -69,7 +69,7 @@ are handy if you need to access multiple urls but would prefer a single object.
     require 'hot_tub'
     require 'excon'
     # Our client block must accept the url argument
-    sessions = HotTub::Sessions.new {|url| Excon.new(url) }
+    sessions = HotTub::Session.new {|url| Excon.new(url) }
 
     sessions.run("http://somewebservice.com") do |clnt|    
       puts clnt.get(:query => {:some => 'stuff'}).response_header.status
@@ -81,16 +81,17 @@ are handy if you need to access multiple urls but would prefer a single object.
       puts clnt.get.response_header.status
     end
 
-### HotTub::Sessions with HotTub::Pool
+### HotTub::Session with HotTub::Pool
 Suppose you have a client that is not thread safe, you can use HotTub::Pool with HotTub::Sessions to get what you need.
     
     require 'hot_tub'
     require "em-synchrony"
     require "em-synchrony/em-http"
-    # Our client block must accept the url argument
 
+    # We ust tell HotTub::Session to use HotTub::Pool, pass any pool options in our 
+    # options has, and our client block must accept the url argument
     EM.synchrony do {
-      sessions = HotTub::Sessions.new(:with_pool => true, :size => 12) {|url| EM::HttpRequest.new(url, :inactivity_timeout => 0) }
+      sessions = HotTub::Session.new(:with_pool => true, :size => 12) {|url| EM::HttpRequest.new(url, :inactivity_timeout => 0) }
 
       sessions.run("http://somewebservice.com") do |clnt|    
         puts clnt.get(:query => results).response_header.status
