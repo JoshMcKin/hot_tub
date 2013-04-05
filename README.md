@@ -1,7 +1,6 @@
 # HotTub [![Build Status](https://travis-ci.org/JoshMcKin/hot_tub.png?branch=master)](https://travis-ci.org/JoshMcKin/hot_tub)
 A simple thread-safe connection pool and sessions gem. Out-of-the-box support for [Excon](https://github.com/geemus/excon) and
 [EM-Http-Requests](https://github.com/igrigorik/em-http-request) via [EM-Synchrony](https://github.com/igrigorik/em-synchrony). 
-There are a couple Ruby connection pooling libraries out there but HotTub differs from most with all its features.
 
 ## Features
 
