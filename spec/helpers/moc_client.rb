@@ -6,7 +6,8 @@ class MocClient
 
   # Perform an IO
   def get
-    return `sleep #{self.class.sleep_time}; echo "that was slow IO"`
+    sleep(self.class.sleep_time)
+    "that was slow IO"
   end
 
   def close
