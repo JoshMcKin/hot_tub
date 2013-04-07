@@ -134,10 +134,11 @@ module HotTub
     end
 
     def add
-      HotTub.logger.info "Adding HotTub client: #{@client.class.name} to pool"
       @last_activity = Time.now
       @current_size += 1
-      @pool << new_client
+      nc = new_client
+      HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
+      @pool << nc
     end
 
     def reap_pool?
