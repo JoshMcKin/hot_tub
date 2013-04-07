@@ -252,7 +252,7 @@ describe HotTub::Pool do
             t.join
           end
         }.should_not raise_error
-        (@pool.instance_variable_get(:@pool).length == 10).should be_true # make sure work got done
+        (@pool.instance_variable_get(:@pool).length <= 10).should be_true # make sure work got done
         results = threads.collect{ |t| t[:status]}
         results.length.should eql(25) # make sure all threads are present
         results.uniq.should eql([200]) # make sure all returned status 200
