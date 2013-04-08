@@ -6,7 +6,7 @@ A simple thread-safe connection pool and sessions gem. Out-of-the-box support fo
 ## Features
 
 ### HotTub::Pool
-* Thread safe
+* Thread safe / Fiber safe (with EM::HttpRequest + EM::Synchrony)
 * Lazy clients/connections (created only when necessary)
 * Can be used with any client library
 * Support for cleaning dirty resources
@@ -14,10 +14,14 @@ A simple thread-safe connection pool and sessions gem. Out-of-the-box support fo
 * Attempts to close clients/connections at_exit
 
 ### HotTub::Session
-* Thread safe
+* Thread safe / Fiber safe (with EM::HttpRequest + EM::Synchrony)
 * The same api as HotTub::Pool
 * Can be used with HotTub::Pool or any client library 
 * Attempts to close clients/connections at_exit
+
+## Requirements
+HotTub is tested on MRI, JRUBY and Rubinius
+* Ruby >= 1.9
 
 ## Installation
 
@@ -25,7 +29,7 @@ HotTub is available through [Rubygems](https://rubygems.org/gems/hot_tub) and ca
 
     $ gem install hot_tub
 
-## Rails setup
+### Rails setup
 
 Add hot_tub to your gemfile:
     
@@ -59,7 +63,7 @@ Close and clean can be defined at initialization with lambdas, if they are not d
 
     url = "http://test12345.com"
     pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
-    pool.run { |clnt| clnt.get(@@url,query).body }
+    pool.run { |clnt| clnt.get(url,query).body }
  
 ## HotTub::Session Usage 
 HotTub::Sessions are a synchronized hash of clients/pools and are implemented similar HotTub::Pool. 
@@ -82,13 +86,13 @@ are handy if you need to access multiple urls but would prefer a single object.
     end
 
 ### HotTub::Session with HotTub::Pool
-Suppose you have a client that is not thread safe, you can use HotTub::Pool with HotTub::Sessions to get what you need.
+Suppose you have a client that is not thread safe, or does not have a built in pool and does not support sessions, you can use HotTub::Pool with HotTub::Sessions to get what you need.
     
     require 'hot_tub'
     require "em-synchrony"
     require "em-synchrony/em-http"
 
-    # We ust tell HotTub::Session to use HotTub::Pool, pass any pool options in our 
+    # We must tell HotTub::Session to use HotTub::Pool, pass any pool options in our 
     # options has, and our client block must accept the url argument
     EM.synchrony do {
       sessions = HotTub::Session.new(:with_pool => true, :size => 12) {|url| EM::HttpRequest.new(url, :inactivity_timeout => 0) }
