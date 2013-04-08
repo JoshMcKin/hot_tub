@@ -6,8 +6,10 @@ require 'excon'
 require 'helpers/moc_client'
 require 'helpers/server'
 require 'net/https'
-require 'coveralls'
-Coveralls.wear! unless HotTub.jruby? || HotTub.rbx?
+unless HotTub.jruby? || HotTub.rbx?
+  require 'coveralls'
+  Coveralls.wear!
+end
 
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
@@ -15,12 +17,12 @@ Coveralls.wear! unless HotTub.jruby? || HotTub.rbx?
 HotTub.logger.level = Logger::ERROR
 
 RSpec.configure do |config|
- config.before(:suite) do
-  HotTub::Server.run
-  HotTub::Server2.run
- end
- config.after(:suite) do
-  HotTub::Server.teardown
-  HotTub::Server2.teardown
- end
+  config.before(:suite) do
+    HotTub::Server.run
+    HotTub::Server2.run
+  end
+  config.after(:suite) do
+    HotTub::Server.teardown
+    HotTub::Server2.teardown
+  end
 end
