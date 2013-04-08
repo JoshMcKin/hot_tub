@@ -26,4 +26,8 @@ module HotTub
   def self.jruby?
     (defined?(JRUBY_VERSION))
   end
+
+  def self.rbx?
+    defined?(RUBY_ENGINE) and RUBY_ENGINE == 'rbx'
+  end
 end
