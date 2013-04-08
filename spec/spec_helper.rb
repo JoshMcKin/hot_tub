@@ -6,6 +6,8 @@ require 'excon'
 require 'helpers/moc_client'
 require 'helpers/server'
 require 'net/https'
+require 'coveralls'
+Coveralls.wear!
 
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
