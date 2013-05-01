@@ -85,6 +85,15 @@ describe HotTub::Pool do
         @pool.send(:_add)
       end
     end
+
+    it "should reset register" do
+      @pool.current_size.should eql(5)
+      @pool.instance_variable_get(:@register).length.should eql(5)
+      @pool.close_all
+      @pool.instance_variable_get(:@register).length.should eql(0)
+      @pool.current_size.should eql(0)
+    end
+
     it "should reset pool" do
       @pool.current_size.should eql(5)
       @pool.instance_variable_get(:@pool).length.should eql(5)
@@ -131,6 +140,26 @@ describe HotTub::Pool do
         pre_add_length = @pool.instance_variable_get(:@pool).length
         @pool.send(:_add)
         @pool.instance_variable_get(:@pool).length.should be > pre_add_length
+      end
+    end
+
+    describe '#push' do
+      context "connection is registered" do
+        it "should push connection back to pool" do
+          @pool.send(:_add)
+          clnt = @pool.instance_variable_get(:@pool).pop
+          @pool.send(:push,clnt)
+          @pool.instance_variable_get(:@pool).include?(clnt).should be_true
+        end
+      end
+      context "connection is not registered" do
+        it "should not push connection back to pool" do
+          @pool.send(:_add)
+          clnt = @pool.instance_variable_get(:@pool).pop
+          @pool.instance_variable_get(:@register).delete(clnt)
+          @pool.send(:push,clnt)
+          @pool.instance_variable_get(:@pool).include?(clnt).should be_false
+        end
       end
     end
   end

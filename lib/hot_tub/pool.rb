@@ -35,11 +35,12 @@ module HotTub
         :close => nil,            # => lambda {|clnt| clnt.close}
         :clean => nil             # => lambda {|clnt| clnt.clean}
       }.merge(options)
-      @pool = []
-      @current_size = 0
-      @mutex = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
-      @last_activity = Time.now
-      @fetching_client = false
+      @pool             = []    # stores available connection
+      @register         = []    # stores all connections at all times
+      @current_size     = 0
+      @pool_mutex       = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @last_activity    = Time.now
+      @fetching_client  = false
     end
 
     # Hand off to client.run
@@ -56,8 +57,9 @@ module HotTub
 
     # Calls close on all connections and reset the pools
     def close_all
-      @mutex.synchronize do
-        while clnt = @pool.pop
+      @pool_mutex.synchronize do
+        while clnt = @register.pop
+          @pool.delete(clnt)
           begin
             close_client(clnt)
           rescue => e
@@ -97,10 +99,15 @@ module HotTub
       raise BlockingTimeout, message
     end
 
-    # Safely add client back to pool
+    # Safely add client back to pool, only if
+    # that clnt is registered
     def push(clnt)
-      @mutex.synchronize do
-        @pool << clnt
+      @pool_mutex.synchronize do
+        if @register.include?(clnt)
+          @pool << clnt 
+        else
+          close_client(clnt)
+        end
       end
       nil # make sure never return the pool
     end
@@ -108,7 +115,7 @@ module HotTub
     # Safely pull client from pool, adding if allowed
     def pop
       @fetching_client = true # kill reap_pool
-      @mutex.synchronize do
+      @pool_mutex.synchronize do
         _add if add?
         clnt = @pool.pop # get warm connection
         if (clnt.nil? && @options[:never_block])
@@ -133,27 +140,32 @@ module HotTub
       (@pool.length == 0 && (@options[:size] > @current_size))
     end
 
-    def _add
-      @last_activity = Time.now
-      @current_size += 1
-      nc = new_client
-      HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
-      @pool << nc
-    end
-
     def reap_pool?
       (!@fetching_client && (@current_size > @options[:size]) && ((@last_activity + (600)) < Time.now))
     end
 
     # Remove extra connections from front of pool
     def reap_pool
-      @mutex.synchronize do
+      @pool_mutex.synchronize do
         if reap_pool? && clnt = @pool.shift
+          @register.delete(clnt)
           @current_size -= 1
           close_client(clnt)
         end
       end
     end
+
+    # _add is volatile; and may cause theading issues 
+    # if called outside @pool_mutex.synchronize {}
+    def _add
+      @last_activity = Time.now
+      @current_size += 1
+      nc = new_client
+      HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
+      @register << nc
+      @pool << nc
+    end
+    # end volatile 
   end
   class BlockingTimeout < StandardError;end
 end

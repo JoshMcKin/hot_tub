@@ -10,13 +10,13 @@ Gem::Specification.new do |s|
   s.homepage    = "https://github.com/JoshMcKin/hot_tub"
   s.license     = "MIT"
   s.summary     = %q{A simple thread-safe http connection pooling gem.}
-  s.description = %q{A simple thread-safe http connection pooling gem. Http client options include HTTPClient and EM-Http-Request}
+  s.description = %q{A simple thread-safe http connection pooling gem. Out-of-the-box support for Excon and EM-Http-Request}
 
   s.rubyforge_project = "hot_tub"
   
   s.add_development_dependency "rspec"
   s.add_development_dependency "sinatra"
-  s.add_development_dependency "puma", "~> 2.0.0.b7"
+  s.add_development_dependency "puma", "~> 2.0.0"
   s.add_development_dependency "excon"
   
   s.files         = `git ls-files`.split("\n")
