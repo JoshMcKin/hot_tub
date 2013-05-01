@@ -59,8 +59,8 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
     }
 
 ### Other
-You can use any library you want with HotTub::Pool, regardless of that clients thread-safety status.
-Close and clean can be defined at initialization with lambdas, if they are not defined they are ignored.
+You can use any library you want with HotTub::Pool. Close and clean can be defined at initialization 
+with lambdas, if they are not defined they are ignored.
 
     url = "http://test12345.com"
     pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
