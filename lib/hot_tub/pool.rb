@@ -37,10 +37,10 @@ module HotTub
       @pool             = []    # stores available connection
       @register         = []    # stores all connections at all times
       @current_size     = 0
-      @pool_mutex       = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @pool_mutex       = (em_client? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
       @last_activity    = Time.now
       @fetching_client  = false
-      HotTub.hot_at_exit {close_all}
+      HotTub.hot_at_exit( em_client? ) {close_all}
     end
 
     # Hand off to client.run
@@ -72,7 +72,7 @@ module HotTub
 
     private
 
-    def fiber_mutex?
+    def em_client?
       begin
         (HotTub.em_synchrony? && @client_block.call.is_a?(EventMachine::HttpConnection))
       rescue

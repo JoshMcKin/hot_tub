@@ -36,8 +36,8 @@ module HotTub
       @options = options || {}
       @client_block = client_block
       @sessions = Hash.new
-      @mutex = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
-      HotTub.hot_at_exit {close_all}
+      @mutex = (em_client? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      HotTub.hot_at_exit( em_client? ) {close_all}
     end
 
     # Synchronizes initialization of our sessions
@@ -81,7 +81,7 @@ module HotTub
 
     private
 
-    def fiber_mutex?
+    def em_client?
       begin
         (HotTub.em_synchrony? && @client_block.call("http://moc").is_a?(EventMachine::HttpConnection))
       rescue

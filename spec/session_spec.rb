@@ -145,7 +145,7 @@ describe HotTub::Session do
 
     unless HotTub.jruby?
 
-      describe "fiber_mutex?" do
+      describe "em_client?" do
 
         context 'EM::HttpRequest as client' do
           before(:each) do
@@ -154,20 +154,20 @@ describe HotTub::Session do
           context "EM::Synchrony is present" do
             it "should be true" do
               HotTub.stub(:em_synchrony?).and_return(true)
-              @session.send(:fiber_mutex?).should be_true
+              @session.send(:em_client?).should be_true
             end
           end
           context "EM::Synchrony is not present" do
             it "should be false" do
               HotTub.stub(:em_synchrony?).and_return(false)
-              @session.send(:fiber_mutex?).should be_false
+              @session.send(:em_client?).should be_false
             end
           end
         end
         context 'client is not EM::HttpRequest' do
           it "should be false" do
             session = HotTub::Session.new {|url| MocClient.new}
-            session.send(:fiber_mutex?).should be_false
+            session.send(:em_client?).should be_false
           end
         end
       end

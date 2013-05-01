@@ -66,7 +66,7 @@ Close and clean can be defined at initialization with lambdas, if they are not d
     pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
     pool.run { |clnt| clnt.get(url,query).body }
  
-## HotTub::Session Usage 
+## HotTub::Session
 HotTub::Sessions are a synchronized hash of clients/pools and are implemented similar HotTub::Pool. 
 For example, Excon is thread safe but you set a single url at the client level so sessions 
 are handy if you need to access multiple urls but would prefer a single object.
