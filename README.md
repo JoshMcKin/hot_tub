@@ -11,13 +11,13 @@ A simple thread-safe connection pool and sessions gem. Out-of-the-box support fo
 * Can be used with any client library
 * Support for cleaning dirty resources
 * Set to expand pool under load that is eventually reaped back down to set size (never_block), can be disabled
-* Attempts to close clients/connections at_exit
+* Attempts to close clients/connections on shutdown
 
 ### HotTub::Session
 * Thread safe / Fiber safe (with EM::HttpRequest + EM::Synchrony)
 * The same api as HotTub::Pool
 * Can be used with HotTub::Pool or any client library 
-* Attempts to close clients/connections at_exit
+* Attempts to close clients/connections on shutdown
 
 ## Requirements
 HotTub is tested on MRI, JRUBY and Rubinius
@@ -53,6 +53,7 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
     require 'em-synchrony/em-http'
     EM.synchrony do {
       pool = HotTub::Pool.new(:size => 12) { EM::HttpRequest.new("http://somewebservice.com") }
+      # Make sure we set :keepalive as true
       pool.run { |clnt| clnt.aget(:query => results, :keepalive => true) }
       EM.stop
     }
@@ -86,7 +87,7 @@ are handy if you need to access multiple urls but would prefer a single object.
     end
 
 ### HotTub::Session with HotTub::Pool
-Suppose you have a client that is not thread safe, or does not have a built in pool and does not support sessions, you can use HotTub::Pool with HotTub::Sessions to get what you need.
+Suppose you have a client that lacks pooling and session features you can use HotTub::Pool with HotTub::Sessions to get what you need.
     
     require 'hot_tub'
     require "em-synchrony"
@@ -98,10 +99,10 @@ Suppose you have a client that is not thread safe, or does not have a built in p
       sessions = HotTub::Session.new(:with_pool => true, :size => 12) {|url| EM::HttpRequest.new(url, :inactivity_timeout => 0) }
 
       sessions.run("http://somewebservice.com") do |clnt|    
-        puts clnt.get(:query => results).response_header.status
+        puts clnt.get(:query => results, :keepalive => true).response_header.status
       end
       sessions.run("https://someotherwebservice.com") do |clnt|    
-        puts clnt.get(:query => results).response_header.status
+        puts clnt.get(:query => results, :keepalive => true).response_header.status
       end
       EM.stop
     }

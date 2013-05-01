@@ -35,7 +35,7 @@ module HotTub
     if self.em?
       EM.add_shutdown_hook &blk
     else
-      at_exit &blk # close connections at exit
+      at_exit &blk
     end
   end
 end
