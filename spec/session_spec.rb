@@ -120,7 +120,6 @@ describe HotTub::Session do
         failed = false
         start_time = Time.now
         stop_time = nil
-        mutex = Mutex.new
         threads = []
         lambda {
           10.times.each do

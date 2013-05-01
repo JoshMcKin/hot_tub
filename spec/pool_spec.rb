@@ -82,7 +82,7 @@ describe HotTub::Pool do
     before(:each) do
       @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
       5.times do
-        @pool.send(:add)
+        @pool.send(:_add)
       end
     end
     it "should reset pool" do
@@ -126,10 +126,11 @@ describe HotTub::Pool do
       end
     end
 
-    describe '#add' do
+    describe '#_add' do
       it "should add connections for supplied url"do
-        @pool.send(:add)
-        @pool.instance_variable_get(:@pool).should_not be_nil
+        pre_add_length = @pool.instance_variable_get(:@pool).length
+        @pool.send(:_add)
+        @pool.instance_variable_get(:@pool).length.should be > pre_add_length
       end
     end
   end

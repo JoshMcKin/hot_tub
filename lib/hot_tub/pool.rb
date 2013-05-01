@@ -109,10 +109,10 @@ module HotTub
     def pop
       @fetching_client = true # kill reap_pool
       @mutex.synchronize do
-        add if add?
+        _add if add?
         clnt = @pool.pop # get warm connection
         if (clnt.nil? && @options[:never_block])
-          add
+          _add
           clnt = @pool.pop
         end
         @fetching_client = false
@@ -133,7 +133,7 @@ module HotTub
       (@pool.length == 0 && (@options[:size] > @current_size))
     end
 
-    def add
+    def _add
       @last_activity = Time.now
       @current_size += 1
       nc = new_client
