@@ -26,7 +26,6 @@ module HotTub
     #
     def initialize(options={},&client_block)
       raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
-      at_exit { close_all } # close connections at exit
       @client_block = client_block
       @options = {
         :size => 5,
@@ -41,6 +40,7 @@ module HotTub
       @pool_mutex       = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
       @last_activity    = Time.now
       @fetching_client  = false
+      HotTub.hot_at_exit {close_all}
     end
 
     # Hand off to client.run

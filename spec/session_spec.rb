@@ -204,7 +204,6 @@ describe HotTub::Session do
             sessions.instance_variable_get(:@sessions).keys.length.should eql(1)
             (sessions.sessions(@url).instance_variable_get(:@pool).length >= 5).should be_true #make sure work got done
             failed.should be_false # Make sure our requests worked
-            sessions.close_all
             EM.stop
           end
         end

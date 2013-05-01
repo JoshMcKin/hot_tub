@@ -33,11 +33,11 @@ module HotTub
     #
     def initialize(options={},&client_block)
       raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
-      at_exit { close_all } # close connections at exit
       @options = options || {}
       @client_block = client_block
       @sessions = Hash.new
       @mutex = (fiber_mutex? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      HotTub.hot_at_exit {close_all}
     end
 
     # Synchronizes initialization of our sessions

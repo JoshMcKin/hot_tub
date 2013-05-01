@@ -30,4 +30,12 @@ module HotTub
   def self.rbx?
     defined?(RUBY_ENGINE) and RUBY_ENGINE == 'rbx'
   end
+
+  def self.hot_at_exit &blk
+    if self.em?
+      EM.add_shutdown_hook &blk
+    else
+      at_exit &blk # close connections at exit
+    end
+  end
 end
