@@ -1,5 +1,24 @@
 require 'uri'
 module HotTub
+  class EmCache < Hash
+    def initialize
+      @mutex = EM::Synchrony::Thread::Mutex.new
+      super
+    end
+
+    def [](key)
+      @mutex.synchronize do
+        super
+      end
+    end
+
+    def []=(key,val)
+      @mutex.synchronize do
+        super
+      end
+    end
+  end
+
   class Session
     include HotTub::KnownClients
     # A HotTub::Session is a synchronized hash used to separate pools/clients by their domain.
@@ -35,8 +54,7 @@ module HotTub
       raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
       @options = options || {}
       @client_block = client_block
-      @sessions = Hash.new
-      @mutex = (em_client? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @sessions = (em_client? ? EmCache.new : ThreadSafe::Cache.new)
       HotTub.hot_at_exit( em_client? ) {close_all}
     end
 
@@ -45,14 +63,14 @@ module HotTub
     def sessions(url)
       key = to_key(url)
       return @sessions[key] if @sessions[key]
-      @mutex.synchronize do
+      #@mutex.synchronize do
         if @options[:with_pool]
           @sessions[key] = HotTub::Pool.new(@options) { @client_block.call(url) }
         else
           @sessions[key] = @client_block.call(url) if @sessions[key].nil?
         end
         @sessions[key]
-      end
+      #end
     end
 
     def run(url,&block)
@@ -63,7 +81,7 @@ module HotTub
 
     # Calls close on all pools/clients in sessions
     def close_all
-      @sessions.each do |key,clnt|
+      @sessions.each_pair do |key,clnt|
         if clnt.is_a?(HotTub::Pool)
           clnt.close_all
         else
@@ -73,9 +91,9 @@ module HotTub
             HotTub.logger.error "There was an error close one of your HotTub::Session clients: #{e}"
           end
         end
-        @mutex.synchronize do
+        #@mutex.synchronize do
           @sessions[key] = nil
-        end
+        #end
       end
     end
 
