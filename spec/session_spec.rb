@@ -2,10 +2,6 @@ require 'spec_helper'
 require 'hot_tub/session'
 require 'uri'
 require 'time'
-unless HotTub.jruby?
-  require "em-synchrony"
-  require "em-synchrony/em-http"
-end
 describe HotTub::Session do
 
   context 'initialized without a block' do
@@ -102,12 +98,19 @@ describe HotTub::Session do
       context "with_pool" do
         it "should pass run to pool" do
           url = HotTub::Server.url
-          session_with_pool = HotTub::Session.new({:with_pool => true})  { |url| Excon.new(url) }
+          session_with_pool = HotTub::Session.new({:with_pool => true})  { |url|
+            uri = URI.parse(url)
+            http = Net::HTTP.new(uri.host, uri.port)
+            http.use_ssl = false
+            http.start
+            http
+          }
           result = nil
           session_with_pool.run(url) do |conn|
-            result = conn.get.status
+            uri = URI.parse(url)
+            result = conn.get(uri.path).code
           end
-          result.should eql(200)
+          result.should eql('200')
         end
       end
     end
@@ -116,7 +119,13 @@ describe HotTub::Session do
       it "should work" do
         url = HotTub::Server.url
         url2 = HotTub::Server2.url
-        session = HotTub::Session.new(:with_pool => true) { |url| Excon.new(url)}
+        session = HotTub::Session.new(:with_pool => true) { |url|
+            uri = URI.parse(url)
+            http = Net::HTTP.new(uri.host, uri.port)
+            http.use_ssl = false
+            http.start
+            http
+          }
         failed = false
         start_time = Time.now
         stop_time = nil
@@ -124,9 +133,8 @@ describe HotTub::Session do
         lambda {
           10.times.each do
             threads << Thread.new do
-              # MocClient is not thread safe so lets initialize a new instance for each
-              session.run(url)  { |clnt| Thread.current[:result] = clnt.get.status }
-              session.run(url2) { |clnt| Thread.current[:result] = clnt.get.status }
+              session.run(url)  { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
+              session.run(url2) { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
             end
           end
           threads.each do |t|
@@ -140,75 +148,6 @@ describe HotTub::Session do
         results.uniq.should eql([results.first]) # make sure we got the same results
         ((stop_time.to_i - start_time.to_i) < (results.length * MocClient.sleep_time)).should be_true # make sure IO is running parallel
         session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure sessions were created
-      end
-    end
-
-    unless HotTub.jruby?
-
-      describe "em_client?" do
-
-        context 'EM::HttpRequest as client' do
-          before(:each) do
-            @session = HotTub::Session.new {|url| EM::HttpRequest.new(url)}
-          end
-          context "EM::Synchrony is present" do
-            it "should be true" do
-              HotTub.stub(:em_synchrony?).and_return(true)
-              @session.send(:em_client?).should be_true
-            end
-          end
-          context "EM::Synchrony is not present" do
-            it "should be false" do
-              HotTub.stub(:em_synchrony?).and_return(false)
-              @session.send(:em_client?).should be_false
-            end
-          end
-        end
-        context 'client is not EM::HttpRequest' do
-          it "should be false" do
-            session = HotTub::Session.new {|url| MocClient.new}
-            session.send(:em_client?).should be_false
-          end
-        end
-      end
-
-      context 'fibers' do
-        it "should work" do
-          EM.synchrony do
-            url = HotTub::Server.url
-            sessions = HotTub::Session.new(:with_pool => true) {|url| EM::HttpRequest.new(url)}
-            failed = false
-            fibers = []
-            lambda {
-              10.times.each do
-                fibers << Fiber.new do
-                  sessions.run(url) {|connection|
-                   s = connection.head(:keepalive => true).response_header.status
-                  failed = true unless s == 200}
-                end
-              end
-              fibers.each do |f|
-                f.resume
-              end
-              loop do
-                done = true
-                fibers.each do |f|
-                  done = false if f.alive?
-                end
-                if done
-                  break
-                else
-                  EM::Synchrony.sleep(0.01)
-                end
-              end
-            }.should_not raise_error
-            sessions.instance_variable_get(:@sessions).keys.length.should eql(1)
-            (sessions.sessions(url).instance_variable_get(:@pool).length >= 5).should be_true #make sure work got done
-            failed.should be_false # Make sure our requests worked
-            sessions.close_all
-            EM.stop
-          end
-        end
       end
     end
   end

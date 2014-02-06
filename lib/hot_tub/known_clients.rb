@@ -4,20 +4,13 @@ module HotTub
       "Excon::Connection" => {
         :close => lambda { |clnt| clnt.reset }
       },
-      'EventMachine::HttpConnection' => {
-        :close => lambda { |clnt|
-          if clnt.conn
-            clnt.conn.close_connection
-            clnt.instance_variable_set(:@deferred, true)
-          end
-        },
-        :clean => lambda { |clnt|
-          if clnt.conn && clnt.conn.error?
-            HotTub.logger.info "Sanitizing connection : #{EventMachine::report_connection_error_status(clnt.conn.instance_variable_get(:@signature))}"
-            clnt.conn.close_connection
-            clnt.instance_variable_set(:@deferred, true)
-          end
-          clnt
+      "Net::HTTP" => {
+        :close => lambda { |clnt| 
+          begin
+            clnt.finish
+          rescue IOError
+            nil
+          end 
         }
       }
     }

@@ -1,8 +1,4 @@
 require 'spec_helper'
-unless HotTub.jruby?
-  require "em-synchrony"
-  require "em-synchrony/em-http"
-end
 describe HotTub::Pool do
 
   context 'default settings' do
@@ -125,13 +121,13 @@ describe HotTub::Pool do
       it "should be true if @pool_data[:length] is less than desired pool size and
     the pool is empty?"do
         @pool.instance_variable_set(:@pool,[])
-        @pool.send(:add?).should be_true
+        @pool.send(:_add?).should be_true
       end
 
       it "should be false pool has reached pool_size" do
         @pool.instance_variable_set(:@options,{:size => 5})
         @pool.instance_variable_set(:@pool,["connection","connection","connection","connection","connection"])
-        @pool.send(:add?).should be_false
+        @pool.send(:_add?).should be_false
       end
     end
 
@@ -245,14 +241,23 @@ describe HotTub::Pool do
     end
   end
 
-  context 'Excon' do # Excon has its own pool, but just need to test with a real non-EM library
+  context 'Net::Http' do
     before(:each) do
-      @pool = HotTub::Pool.new(:size => 10) { Excon.new(HotTub::Server.url)}
+      @pool = HotTub::Pool.new(:size => 10) { 
+        uri = URI.parse(HotTub::Server.url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = false
+        http.start
+        http
+      }
     end
     it "should work" do
       result = nil
-      @pool.run{|clnt| result = clnt.head.status}
-      result.should eql(200)
+      @pool.run{|clnt| 
+        uri = URI.parse(HotTub::Server.url)
+        result = clnt.head(uri.path).code
+      }
+      result.should eql('200')
     end
     context 'threads' do
       it "should work" do
@@ -261,7 +266,10 @@ describe HotTub::Pool do
         lambda {
           15.times.each do
             threads << Thread.new do
-              @pool.run{|connection| Thread.current[:status] = connection.head.status }
+              @pool.run{|connection| 
+                uri = URI.parse(HotTub::Server.url)
+                Thread.current[:status] = connection.head(uri.path).code 
+              }
             end
           end
           sleep(0.01)
@@ -274,7 +282,8 @@ describe HotTub::Pool do
         lambda {
           10.times.each do
             threads << Thread.new do
-              @pool.run{|connection| Thread.current[:status] = connection.head.status }
+              uri = URI.parse(HotTub::Server.url)
+              @pool.run{|connection| Thread.current[:status] = connection.head(uri.path).code }
             end
           end
           sleep(0.01)
@@ -284,91 +293,7 @@ describe HotTub::Pool do
         }.should_not raise_error
         results = threads.collect{ |t| t[:status]}
         results.length.should eql(25) # make sure all threads are present
-        results.uniq.should eql([200]) # make sure all returned status 200
-      end
-    end
-  end
-
-  unless HotTub.jruby?
-    describe "em_client?" do
-        context 'EM::HttpRequest as client' do
-          before(:each) do
-            @pool = HotTub::Pool.new { EM::HttpRequest.new(HotTub::Server.url) }
-          end
-          context "EM::Synchrony is present" do
-            it "should be true" do
-              HotTub.stub(:em_synchrony?).and_return(true)
-              @pool.send(:em_client?).should be_true
-            end
-          end
-          context "EM::Synchrony is not present" do
-            it "should be false" do
-              HotTub.stub(:em_synchrony?).and_return(false)
-              @pool.send(:em_client?).should be_false
-            end
-          end
-        end
-        context 'client is not EM::HttpRequest' do
-          it "should be false" do
-            pool = HotTub::Pool.new {|url| MocClient.new}
-            pool.send(:em_client?).should be_false
-          end
-        end
-      end
-
-    context 'EM:HTTPRequest' do
-      before(:each) do
-        @url = HotTub::Server.url
-      end
-
-      it "should work" do
-        EM.synchrony do
-          status = []
-          c = HotTub::Pool.new {EM::HttpRequest.new(@url)}
-          c.run { |conn| status << conn.head(:keepalive => true).response_header.status}
-          c.run { |conn| status << conn.ahead(:keepalive => true).response_header.status}
-          c.run { |conn| status << conn.head(:keepalive => true).response_header.status}
-          status.should eql([200,0,200])
-          c.close_all
-          EM.stop
-        end
-      end
-
-      context 'fibers' do
-        it "should work" do
-          EM.synchrony do
-            pool = HotTub::Pool.new({:size => 5, :fiber_mutex => true}) {EM::HttpRequest.new(@url)}
-            failed = false
-            fibers = []
-            lambda {
-              10.times.each do
-                fibers << Fiber.new do
-                  pool.run{|connection|
-                    s = connection.head(:keepalive => true).response_header.status
-                  failed = true unless s == 200}
-                end
-              end
-              fibers.each do |f|
-                f.resume
-              end
-              loop do
-                done = true
-                fibers.each do |f|
-                  done = false if f.alive?
-                end
-                if done
-                  break
-                else
-                  EM::Synchrony.sleep(0.01)
-                end
-              end
-            }.should_not raise_error
-            (pool.instance_variable_get(:@pool).length >= 5).should be_true #make sure work got done
-            failed.should be_false # Make sure our requests worked
-            pool.close_all
-            EM.stop
-          end
-        end
+        results.uniq.should eql(['200']) # make sure all returned status 200
       end
     end
   end

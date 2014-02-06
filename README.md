@@ -1,12 +1,11 @@
 # HotTub [![Build Status](https://travis-ci.org/JoshMcKin/hot_tub.png?branch=master)](https://travis-ci.org/JoshMcKin/hot_tub) [![Coverage Status](https://coveralls.io/repos/JoshMcKin/hot_tub/badge.png?branch=master)](https://coveralls.io/r/JoshMcKin/hot_tub)
 
-A simple thread-safe connection pool and sessions gem. Out-of-the-box support for [Excon](https://github.com/geemus/excon) and
-[EM-Http-Requests](https://github.com/igrigorik/em-http-request) via [EM-Synchrony](https://github.com/igrigorik/em-synchrony). 
+A simple thread-safe connection pool and sessions gem. 
 
 ## Features
 
 ### HotTub::Pool
-* Thread safe / Fiber safe (with EM::HttpRequest + EM::Synchrony)
+* Thread safe
 * Lazy clients/connections (created only when necessary)
 * Can be used with any client library
 * Support for cleaning dirty resources
@@ -14,7 +13,7 @@ A simple thread-safe connection pool and sessions gem. Out-of-the-box support fo
 * Attempts to close clients/connections on shutdown
 
 ### HotTub::Session
-* Thread safe / Fiber safe (with EM::HttpRequest + EM::Synchrony)
+* Thread safe
 * The same api as HotTub::Pool
 * Can be used with HotTub::Pool or any client library 
 * Attempts to close clients/connections on shutdown
@@ -47,16 +46,17 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
 
 ## HotTub::Pool
 
-### EM-Http-Request
+### Net::HTTP
     require 'hot_tub'
-    require 'em-synchrony'
-    require 'em-synchrony/em-http'
-    EM.synchrony do {
-      pool = HotTub::Pool.new(:size => 12) { EM::HttpRequest.new("http://somewebservice.com") }
-      # Make sure we set :keepalive as true
-      pool.run { |clnt| clnt.aget(:query => results, :keepalive => true) }
-      EM.stop
-    }
+    require 'net/http'
+    pool = HotTub::Pool.new(:size => 10) { 
+      uri = URI.parse("http://somewebservice.com")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = false
+      http.start
+      http
+      }
+    pool.run {|clnt| puts clnt.head('/').code }
 
 ### Other
 You can use any library you want with HotTub::Pool. Close and clean can be defined at initialization 
@@ -67,8 +67,8 @@ with lambdas, if they are not defined they are ignored.
     pool.run { |clnt| clnt.get(url,query).body }
  
 ## HotTub::Session
-HotTub::Sessions are a synchronized hash of clients/pools and are implemented similar HotTub::Pool. 
-For example, Excon is thread safe but you set a single url at the client level so sessions 
+HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools. 
+For example, [Excon](https://github.com/geemus/excon) is thread safe but you set a single url at the client level so sessions 
 are handy if you need to access multiple urls but would prefer a single object.
     
     require 'hot_tub'
@@ -79,45 +79,36 @@ are handy if you need to access multiple urls but would prefer a single object.
     sessions.run("http://somewebservice.com") do |clnt|    
       puts clnt.get(:query => {:some => 'stuff'}).response_header.status
     end
+
     sessions.run("https://someotherwebservice.com") do |clnt|    
       puts clnt.get(:query => {:other => 'stuff'}).response_header.status
-    end
-    sessions.run("https://127.0.0.1:5252") do |clnt|    
-      puts clnt.get.response_header.status
     end
 
 ### HotTub::Session with HotTub::Pool
 Suppose you have a client that lacks pooling and session features you can use HotTub::Pool with HotTub::Sessions to get what you need.
     
     require 'hot_tub'
-    require "em-synchrony"
-    require "em-synchrony/em-http"
+    require 'net/http'
 
     # We must tell HotTub::Session to use HotTub::Pool, pass any pool options in our 
     # options has, and our client block must accept the url argument
-    EM.synchrony do {
-      sessions = HotTub::Session.new(:with_pool => true, :size => 12) {|url| EM::HttpRequest.new(url, :inactivity_timeout => 0) }
-
-      sessions.run("http://somewebservice.com") do |clnt|    
-        puts clnt.get(:query => results, :keepalive => true).response_header.status
-      end
-      sessions.run("https://someotherwebservice.com") do |clnt|    
-        puts clnt.get(:query => results, :keepalive => true).response_header.status
-      end
-      EM.stop
+    sessions = HotTub::Session.new(:with_pool => true, :size => 12) { |url| 
+      uri = URI.parse(url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = false
+      http.start
+      http 
     }
-
-## Related
-
-* [EM-Http-Request](https://github.com/igrigorik/em-http-request)
-* [EM-Synchrony](https://github.com/igrigorik/em-synchrony)
-* [Excon](https://github.com/geemus/excon) Thread safe with its own built in pool.
-* [HTTPClient](https://github.com/nahi/httpclient) A thread safe http client that supports pools and sessions all by itself.
+    sessions.run("http://somewebservice.com") do |clnt|    
+      puts clnt.head('/').code
+    end
+    sessions.run("https://someotherwebservice.com") do |clnt|    
+      puts clnt.head('/').code
+    end
 
 ## Other Pooling Gem
 
 * [ConnectionPool](https://github.com/mperham/connection_pool)
-* [EM-Synchrony](https://github.com/igrigorik/em-synchrony) has a pool feature
 
 ## Contributing to HotTub
  

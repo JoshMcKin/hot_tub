@@ -16,27 +16,11 @@ module HotTub
     @@logger = logger
   end
 
-  def self.em?
-    (defined?(EM))
-  end
-
-  def self.em_synchrony?
-    (defined?(EM::Synchrony))
-  end
-
   def self.jruby?
     (defined?(JRUBY_VERSION))
   end
 
   def self.rbx?
     defined?(RUBY_ENGINE) and RUBY_ENGINE == 'rbx'
-  end
-
-  def self.hot_at_exit with_em=false, &blk
-    if with_em
-      EM.add_shutdown_hook &blk
-    else
-      at_exit &blk
-    end
   end
 end

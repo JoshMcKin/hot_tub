@@ -5,9 +5,15 @@ module HotTub
 
     # Thread-safe lazy connection pool
     #
-    # == Example EM-Http-Request
-    #     pool = HotTub::Pool.new { EM::HttpRequest.new("http://somewebservice.com") }
-    #     pool.run {|clnt| clnt.get(:keepalive => true).body }
+    # == Example Net::HTTP
+    #     pool = HotTub::Pool.new(:size => 10) { 
+    #       uri = URI.parse("http://somewebservice.com")
+    #       http = Net::HTTP.new(uri.host, uri.port)
+    #       http.use_ssl = false
+    #       http.start
+    #       http
+    #     }
+    #     pool.run {|clnt| puts clnt.head('/').code }
     #
     # HotTub::Pool defaults never_block to true, which means if we run out of
     # connections simply create a new client to continue operations.
@@ -16,10 +22,17 @@ module HotTub
     # grow the set :size, set :never_block to false; blocking_timeout defaults to 10 seconds.
     #
     # == Example without #never_block (will BlockingTimeout exception)
-    #     pool = HotTub::Pool.new(:size => 1, :never_block => false, :blocking_timeout => 0.5) { EM::HttpRequest.new("http://somewebservice.com") }
+    #     pool = HotTub::Pool.new(:size => 1, :never_block => false, :blocking_timeout => 0.5) { 
+    #       uri = URI.parse("http://somewebservice.com")
+    #       http = Net::HTTP.new(uri.host, uri.port)
+    #       http.use_ssl = false
+    #       http.start
+    #       http
+    #     }
+    #     pool.run { |clnt| puts clnt.head('/').code }
     #
     #     begin
-    #       pool.run {|clnt| clnt.get(:keepalive => true).body }
+    #       pool.run { |clnt| puts clnt.head('/').code }
     #     rescue HotTub::BlockingTimeout => e
     #       puts "Our pool ran out: {e}"
     #     end
@@ -37,10 +50,10 @@ module HotTub
       @pool             = []    # stores available connection
       @register         = []    # stores all connections at all times
       @current_size     = 0
-      @pool_mutex       = (em_client? ? EM::Synchrony::Thread::Mutex.new : Mutex.new)
+      @pool_mutex       = Mutex.new
       @last_activity    = Time.now
       @fetching_client  = false
-      HotTub.hot_at_exit( em_client? ) {close_all}
+      at_exit {close_all}
     end
 
     # Hand off to client.run
@@ -56,6 +69,9 @@ module HotTub
     end
 
     # Calls close on all connections and reset the pools
+    # Its possible clients may be returned to the pool after close_all, 
+    # but the close_client block ensures the client should be stale 
+    # and the clean method should repairs those connections if they are called 
     def close_all
       @pool_mutex.synchronize do
         while clnt = @register.pop
@@ -71,14 +87,6 @@ module HotTub
     end
 
     private
-
-    def em_client?
-      begin
-        (HotTub.em_synchrony? && @client_block.call.is_a?(EventMachine::HttpConnection))
-      rescue
-        false
-      end
-    end
 
     # Returns an instance of the client for this pool.
     def client
@@ -116,7 +124,7 @@ module HotTub
     def pop
       @fetching_client = true # kill reap_pool
       @pool_mutex.synchronize do
-        _add if add?
+        _add if _add?
         clnt = @pool.pop # get warm connection
         if (clnt.nil? && @options[:never_block])
           _add
@@ -126,28 +134,19 @@ module HotTub
         clnt
       end
     ensure
-      reap_pool if reap_pool?
+      reap_pool
     end
 
-    # create a new client from base client
-    def new_client
-      @client_block.call
-    end
-
-    # Only want to add a client if the pool is empty in keeping with
-    # a lazy model.
-    def add?
-      (@pool.length == 0 && (@options[:size] > @current_size))
-    end
-
-    def reap_pool?
+    # _reap_pool? is volatile; and may cause be inaccurate 
+    # if called outside @pool_mutex.synchronize {}
+    def _reap_pool?
       (!@fetching_client && (@current_size > @options[:size]) && ((@last_activity + (600)) < Time.now))
     end
 
     # Remove extra connections from front of pool
     def reap_pool
       @pool_mutex.synchronize do
-        if reap_pool? && clnt = @pool.shift
+        if _reap_pool? && clnt = @pool.shift
           @register.delete(clnt)
           @current_size -= 1
           close_client(clnt)
@@ -155,12 +154,19 @@ module HotTub
       end
     end
 
-    # _add is volatile; and may cause theading issues 
+    # Only want to add a client if the pool is empty in keeping with
+    # a lazy model. _add? is volatile; and may cause be in accurate 
+    # if called outside @pool_mutex.synchronize {}
+    def _add?
+      (@pool.length == 0 && (@options[:size] > @current_size))
+    end
+
+    # _add is volatile; and may cause threading issues 
     # if called outside @pool_mutex.synchronize {}
     def _add
       @last_activity = Time.now
       @current_size += 1
-      nc = new_client
+      nc = @client_block.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
       @register << nc
       @pool << nc

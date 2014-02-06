@@ -1,30 +1,12 @@
 require 'uri'
 module HotTub
-  class EmCache < Hash
-    def initialize
-      @mutex = EM::Synchrony::Thread::Mutex.new
-      super
-    end
-
-    def [](key)
-      @mutex.synchronize do
-        super
-      end
-    end
-
-    def []=(key,val)
-      @mutex.synchronize do
-        super
-      end
-    end
-  end
 
   class Session
     include HotTub::KnownClients
-    # A HotTub::Session is a synchronized hash used to separate pools/clients by their domain.
-    # Excon and EmHttpRequest clients are initialized to a specific domain, so we sometimes need a way to
+    # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools. 
+    # Excon clients are initialized to a specific domain, so we sometimes need a way to
     # manage multiple pools like when a process need to connect to various AWS resources. You can use any client
-    # you choose, but make sure you client is threadsafe.
+    # you choose, but make sure you client is thread safe.
     # Example:
     #
     #   sessions = HotTub::Session.new { |url| Excon.new(url) }
@@ -49,13 +31,12 @@ module HotTub
     #     p conn.head.response_header.status
     #   end
     #
-    #
     def initialize(options={},&client_block)
       raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
       @options = options || {}
       @client_block = client_block
-      @sessions = (em_client? ? EmCache.new : ThreadSafe::Cache.new)
-      HotTub.hot_at_exit( em_client? ) {close_all}
+      @sessions =  ThreadSafe::Cache.new
+      at_exit {close_all}
     end
 
     # Synchronizes initialization of our sessions
@@ -94,14 +75,6 @@ module HotTub
     end
 
     private
-
-    def em_client?
-      begin
-        (HotTub.em_synchrony? && @client_block.call("http://moc").is_a?(EventMachine::HttpConnection))
-      rescue
-        false
-      end
-    end
 
     def to_key(url)
       if url.is_a?(String)
