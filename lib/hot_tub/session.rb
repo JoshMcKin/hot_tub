@@ -51,7 +51,7 @@ module HotTub
     #
     #
     def initialize(options={},&client_block)
-      raise ArgumentError, "HotTub::Sessions requre a block on initialization that accepts a single argument" unless block_given?
+      raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
       @options = options || {}
       @client_block = client_block
       @sessions = (em_client? ? EmCache.new : ThreadSafe::Cache.new)
@@ -63,14 +63,12 @@ module HotTub
     def sessions(url)
       key = to_key(url)
       return @sessions[key] if @sessions[key]
-      #@mutex.synchronize do
-        if @options[:with_pool]
-          @sessions[key] = HotTub::Pool.new(@options) { @client_block.call(url) }
-        else
-          @sessions[key] = @client_block.call(url) if @sessions[key].nil?
-        end
-        @sessions[key]
-      #end
+      if @options[:with_pool]
+        @sessions[key] = HotTub::Pool.new(@options) { @client_block.call(url) }
+      else
+        @sessions[key] = @client_block.call(url) if @sessions[key].nil?
+      end
+      @sessions[key]
     end
 
     def run(url,&block)
@@ -91,9 +89,7 @@ module HotTub
             HotTub.logger.error "There was an error close one of your HotTub::Session clients: #{e}"
           end
         end
-        #@mutex.synchronize do
-          @sessions[key] = nil
-        #end
+        @sessions[key] = nil
       end
     end
 
