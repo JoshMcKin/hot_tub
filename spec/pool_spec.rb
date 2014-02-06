@@ -54,11 +54,12 @@ describe HotTub::Pool do
     end
 
     it "should return the connection after use" do
+      @connection = nil
       @pool.run do |connection|
         @connection = connection
       end
       # returned to pool after work was done
-      @pool.instance_variable_get(:@pool).select{|c| c.object_id == @connection.object_id}.length.should eql(1)
+      @pool.instance_variable_get(:@pool).pop.should eql(@connection)    
     end
 
     it "should work" do
