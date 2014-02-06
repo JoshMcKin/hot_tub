@@ -1,4 +1,5 @@
 require 'thread'
+require 'thread_safe'
 require 'logger'
 require "hot_tub/version"
 require "hot_tub/known_clients"
