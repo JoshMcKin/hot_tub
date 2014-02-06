@@ -3,10 +3,10 @@ module HotTub
     include HotTub::KnownClients
     attr_reader :current_size, :fetching_client, :last_activity
 
-    # Thread-safe lazy connection pool
+    # Thread-safe lazy connection pool modeled after Queue
     #
     # == Example Net::HTTP
-    #     pool = HotTub::Pool.new(:size => 10) { 
+    #     pool = HotTub::Pool.new(:size => 10) {
     #       uri = URI.parse("http://somewebservice.com")
     #       http = Net::HTTP.new(uri.host, uri.port)
     #       http.use_ssl = false
@@ -22,7 +22,7 @@ module HotTub
     # grow the set :size, set :never_block to false; blocking_timeout defaults to 10 seconds.
     #
     # == Example without #never_block (will BlockingTimeout exception)
-    #     pool = HotTub::Pool.new(:size => 1, :never_block => false, :blocking_timeout => 0.5) { 
+    #     pool = HotTub::Pool.new(:size => 1, :never_block => false, :blocking_timeout => 0.5) {
     #       uri = URI.parse("http://somewebservice.com")
     #       http = Net::HTTP.new(uri.host, uri.port)
     #       http.use_ssl = false
@@ -48,7 +48,11 @@ module HotTub
         :clean => nil             # => lambda {|clnt| clnt.clean}
       }.merge(options)
       @pool             = []    # stores available connection
+      @pool.taint
       @register         = []    # stores all connections at all times
+      @register.taint
+      @waiting          = []    # waiting threads
+      @waiting.taint
       @current_size     = 0
       @pool_mutex       = Mutex.new
       @last_activity    = Time.now
@@ -69,9 +73,9 @@ module HotTub
     end
 
     # Calls close on all connections and reset the pools
-    # Its possible clients may be returned to the pool after close_all, 
-    # but the close_client block ensures the client should be stale 
-    # and the clean method should repairs those connections if they are called 
+    # Its possible clients may be returned to the pool after close_all,
+    # but the close_client block ensures the client should be stale
+    # and the clean method should repairs those connections if they are called
     def close_all
       @pool_mutex.synchronize do
         while clnt = @register.pop
@@ -112,9 +116,15 @@ module HotTub
     def push(clnt)
       @pool_mutex.synchronize do
         if @register.include?(clnt)
-          @pool << clnt 
+          @pool << clnt
         else
           close_client(clnt)
+        end
+        begin
+          t = @waiting.shift
+          t.wakeup if t
+        rescue ThreadError
+          retry
         end
       end
       nil # make sure never return the pool
@@ -124,12 +134,15 @@ module HotTub
     def pop
       @fetching_client = true # kill reap_pool
       @pool_mutex.synchronize do
-        _add if _add?
-        clnt = @pool.pop # get warm connection
-        if (clnt.nil? && @options[:never_block])
-          _add
-          clnt = @pool.pop
+        if (@pool.empty?)
+          if _add? || @options[:never_block]
+            _add
+          else
+            @waiting.push Thread.current
+            @pool_mutex.sleep
+          end
         end
+        clnt = @pool.pop
         @fetching_client = false
         clnt
       end
@@ -137,7 +150,7 @@ module HotTub
       reap_pool
     end
 
-    # _reap_pool? is volatile; and may cause be inaccurate 
+    # _reap_pool? is volatile; and may cause be inaccurate
     # if called outside @pool_mutex.synchronize {}
     def _reap_pool?
       (!@fetching_client && (@current_size > @options[:size]) && ((@last_activity + (600)) < Time.now))
@@ -155,13 +168,13 @@ module HotTub
     end
 
     # Only want to add a client if the pool is empty in keeping with
-    # a lazy model. _add? is volatile; and may cause be in accurate 
+    # a lazy model. _add? is volatile; and may cause be in accurate
     # if called outside @pool_mutex.synchronize {}
     def _add?
       (@pool.length == 0 && (@options[:size] > @current_size))
     end
 
-    # _add is volatile; and may cause threading issues 
+    # _add is volatile; and may cause threading issues
     # if called outside @pool_mutex.synchronize {}
     def _add
       @last_activity = Time.now
@@ -171,7 +184,7 @@ module HotTub
       @register << nc
       @pool << nc
     end
-    # end volatile 
+    # end volatile
   end
   class BlockingTimeout < StandardError;end
 end
