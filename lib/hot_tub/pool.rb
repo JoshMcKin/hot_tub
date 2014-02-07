@@ -1,7 +1,7 @@
 module HotTub
   class Pool
     include HotTub::KnownClients
-    attr_reader :current_size, :fetching_client, :last_activity
+    attr_reader :current_size, :last_activity
 
     # Thread-safe lazy connection pool modeled after Queue
     #
@@ -37,26 +37,31 @@ module HotTub
     #       puts "Our pool ran out: {e}"
     #     end
     #
-    def initialize(options={},&client_block)
+    def initialize(opts={},&client_block)
       raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
+
+      @size             = (opts[:size] || 5)              # in seconds
+      @blocking_timeout = (opts[:blocking_timeout] || 10) # in seconds
+      @close            = opts[:close]                    # => lambda {|clnt| clnt.close}
+      @clean            = opts[:clean]                    # => lambda {|clnt| clnt.clean}
+      @never_block      = (opts[:never_block].nil? ? true : opts[:never_block]) # Return new client if we run out
       @client_block = client_block
-      @options = {
-        :size => 5,
-        :never_block => true,     # Return new client if we run out
-        :blocking_timeout => 10,  # in seconds
-        :close => nil,            # => lambda {|clnt| clnt.close}
-        :clean => nil             # => lambda {|clnt| clnt.clean}
-      }.merge(options)
+
       @pool             = []    # stores available connection
       @pool.taint
       @register         = []    # stores all connections at all times
       @register.taint
       @waiting          = []    # waiting threads
       @waiting.taint
-      @current_size     = 0
+      @stale            = []    # stale/orphan connections to be reaped
+      @stale.taint      
       @pool_mutex       = Mutex.new
+      @current_size     = 0
       @last_activity    = Time.now
       @fetching_client  = false
+      @reaper           = Thread.new {
+        reap_pool
+      }
       at_exit {close_all}
     end
 
@@ -94,15 +99,46 @@ module HotTub
 
     # Returns an instance of the client for this pool.
     def client
-      clnt = nil
-      alarm = (Time.now + @options[:blocking_timeout])
-      # block until we get an available client or raise Timeout::Error
-      while clnt.nil?
-        raise_alarm if alarm <= Time.now
-        clnt = pop
-      end
+      clnt = pop
       clean_client(clnt)
       clnt
+    end
+
+    # Safely add client back to pool, only if
+    # that clnt is registered
+    def push(clnt)
+      pushed = false
+      reap = false
+      @pool_mutex.synchronize do
+        if @register.include?(clnt)
+          pushed = true
+          @register.delete(clnt)
+          @register << clnt
+          @pool << clnt
+        end
+        begin
+          t = @waiting.shift
+          t.wakeup if t
+        rescue ThreadError
+          retry
+        end
+        reap = _reap_pool?
+      end
+      @stale << clnt unless pushed # orphan close
+      nil # make sure never return the pool
+    ensure
+      begin
+        @reaper.wakeup if reap
+      rescue ThreadError
+      end
+    end
+
+    def alarm_time
+      (Time.now + @blocking_timeout)
+    end
+
+    def raise_alarm?(alm_time)
+      (alm_time <= Time.now)
     end
 
     def raise_alarm
@@ -111,58 +147,49 @@ module HotTub
       raise BlockingTimeout, message
     end
 
-    # Safely add client back to pool, only if
-    # that clnt is registered
-    def push(clnt)
-      @pool_mutex.synchronize do
-        if @register.include?(clnt)
-          @pool << clnt
-        else
-          close_client(clnt)
-        end
-        begin
-          t = @waiting.shift
-          t.wakeup if t
-        rescue ThreadError
-          retry
-        end
-      end
-      nil # make sure never return the pool
-    end
-
     # Safely pull client from pool, adding if allowed
     def pop
       @fetching_client = true # kill reap_pool
+      clnt = nil
       @pool_mutex.synchronize do
-        if (@pool.empty?)
-          if _add? || @options[:never_block]
-            _add
+        alarm = alarm_time
+        while clnt.nil?
+          raise_alarm if raise_alarm?(alarm)
+          if (@pool.empty?)
+            if _add? || @never_block
+              clnt = _add(true)
+            else
+              @waiting.push Thread.current
+              @pool_mutex.sleep(@blocking_timeout)
+            end
           else
-            @waiting.push Thread.current
-            @pool_mutex.sleep
+            clnt = @pool.pop
           end
         end
-        clnt = @pool.pop
         @fetching_client = false
         clnt
       end
-    ensure
-      reap_pool
     end
 
     # _reap_pool? is volatile; and may cause be inaccurate
     # if called outside @pool_mutex.synchronize {}
     def _reap_pool?
-      (!@fetching_client && (@current_size > @options[:size]) && ((@last_activity + (600)) < Time.now))
+      (!@fetching_client && (@current_size > @size) && ((@last_activity + (600)) < Time.now))
     end
 
     # Remove extra connections from front of pool
     def reap_pool
       @pool_mutex.synchronize do
-        if _reap_pool? && clnt = @pool.shift
-          @register.delete(clnt)
-          @current_size -= 1
-          close_client(clnt)
+        while true
+          while stale = @stale.pop
+            close_client(stale)
+          end
+          while _reap_pool? && clnt = @pool.shift
+            @register.delete(clnt)
+            @current_size -= 1
+            close_client(clnt)
+          end
+          @pool_mutex.sleep
         end
       end
     end
@@ -171,20 +198,22 @@ module HotTub
     # a lazy model. _add? is volatile; and may cause be in accurate
     # if called outside @pool_mutex.synchronize {}
     def _add?
-      (@pool.length == 0 && (@options[:size] > @current_size))
+      (@pool.length == 0 && (@size > @current_size))
     end
 
     # _add is volatile; and may cause threading issues
     # if called outside @pool_mutex.synchronize {}
-    def _add
+    def _add(no_pool=false)
       @last_activity = Time.now
       @current_size += 1
       nc = @client_block.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
       @register << nc
+      return nc if no_pool
       @pool << nc
+      nil
     end
-    # end volatile
   end
+
   class BlockingTimeout < StandardError;end
 end

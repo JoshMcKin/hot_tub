@@ -7,11 +7,11 @@ describe HotTub::Pool do
     end
 
     it "should have :size of 5" do
-      @pool.instance_variable_get(:@options)[:size].should eql(5)
+      @pool.instance_variable_get(:@size).should eql(5)
     end
 
     it "should have :blocking_timeout of 0.5" do
-      @pool.instance_variable_get(:@options)[:blocking_timeout].should eql(10)
+      @pool.instance_variable_get(:@blocking_timeout).should eql(10)
     end
 
     it "should have set the client" do
@@ -19,7 +19,7 @@ describe HotTub::Pool do
     end
 
     it "should be true" do
-      @pool.instance_variable_get(:@options)[:never_block].should be_true
+      @pool.instance_variable_get(:@never_block).should be_true
     end
   end
 
@@ -29,15 +29,15 @@ describe HotTub::Pool do
     end
 
     it "should have :size of 5" do
-      @pool.instance_variable_get(:@options)[:size].should eql(10)
+      @pool.instance_variable_get(:@size).should eql(10)
     end
 
     it "should have :blocking_timeout of 0.5" do
-      @pool.instance_variable_get(:@options)[:blocking_timeout].should eql(1.0)
+      @pool.instance_variable_get(:@blocking_timeout).should eql(1.0)
     end
 
     it "should be true" do
-      @pool.instance_variable_get(:@options)[:never_block].should be_false
+      @pool.instance_variable_get(:@never_block).should be_false
     end
   end
 
@@ -108,9 +108,10 @@ describe HotTub::Pool do
 
     describe '#client' do
       it "should raise HotTub::BlockingTimeout if an available is not found in time"do
-        @pool.instance_variable_set(:@options, {:never_block => false, :blocking_timeout => 0.1})
-        @pool.stub(:pop).and_return(nil)
-        lambda { puts @pool.send(:client) }.should raise_error(HotTub::BlockingTimeout)
+        @pool.instance_variable_set(:@never_block,false)
+        @pool.instance_variable_set(:@blocking_timeout, 0.1)
+        @pool.stub(:raise_alarm?).and_return(true)
+        lambda { puts @pool.send(:pop) }.should raise_error(HotTub::BlockingTimeout)
       end
 
       it "should return an instance of the client" do
@@ -126,7 +127,7 @@ describe HotTub::Pool do
       end
 
       it "should be false pool has reached pool_size" do
-        @pool.instance_variable_set(:@options,{:size => 5})
+        @pool.instance_variable_set(:@size, 5)
         @pool.instance_variable_set(:@pool,["connection","connection","connection","connection","connection"])
         @pool.send(:_add?).should be_false
       end
@@ -202,8 +203,10 @@ describe HotTub::Pool do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         pool.instance_variable_set(:@last_activity,(Time.now - 601))
         pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new])
-        pool.instance_variable_set(:@current_size,2)
-        pool.send(:reap_pool)
+        pool.instance_variable_set(:@current_size, 2)
+        pool.send(:_reap_pool?).should be_true
+        pool.instance_variable_get(:@reaper).wakeup # run the reaper thread
+        sleep(0.001) # let results
         pool.current_size.should eql(1)
         pool.instance_variable_get(:@pool).length.should eql(1)
       end
@@ -273,7 +276,7 @@ describe HotTub::Pool do
               }
             end
           end
-          sleep(0.01)
+          sleep(0.001)
           threads.each do |t|
             t.join
           end
@@ -287,7 +290,7 @@ describe HotTub::Pool do
               @pool.run{|connection| Thread.current[:status] = connection.head(uri.path).code }
             end
           end
-          sleep(0.01)
+          sleep(0.001)
           threads.each do |t|
             t.join
           end

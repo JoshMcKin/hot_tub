@@ -31,11 +31,14 @@ module HotTub
     #     p conn.head.response_header.status
     #   end
     #
-    def initialize(options={},&client_block)
+    def initialize(opts={},&client_block)
       raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
-      @options = options || {}
-      @client_block = client_block
-      @sessions =  ThreadSafe::Cache.new
+      @options          = opts
+      @with_pool        = opts[:with_pool]        # true to use HotTub::Pool with supplied client
+      @close            = opts[:close]            # => lambda {|clnt| clnt.close}
+      @clean            = opts[:clean]            # => lambda {|clnt| clnt.clean}
+      @client_block     = client_block
+      @sessions         = ThreadSafe::Cache.new
       at_exit {close_all}
     end
 
@@ -44,7 +47,7 @@ module HotTub
     def sessions(url)
       key = to_key(url)
       return @sessions[key] if @sessions[key]
-      if @options[:with_pool]
+      if @with_pool
         @sessions[key] = HotTub::Pool.new(@options) { @client_block.call(url) }
       else
         @sessions[key] = @client_block.call(url) if @sessions[key].nil?
