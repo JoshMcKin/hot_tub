@@ -52,8 +52,6 @@ module HotTub
       @pool.taint
       @register         = []    # stores all connections at all times
       @register.taint
-      @waiting          = []    # waiting threads
-      @waiting.taint
       @orphans          = []    # orphan connections to be reaped
       @orphans.taint
       

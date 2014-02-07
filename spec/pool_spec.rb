@@ -172,7 +172,7 @@ describe HotTub::Pool do
             pool.run{|connection| connection.get }
           end
         end
-        sleep(1)
+        sleep(0.01)
         threads.each do |t|
           t.join
         end
@@ -188,7 +188,7 @@ describe HotTub::Pool do
             pool.run{|connection| connection.get }
           end
         end
-        sleep(0.2)
+        sleep(0.01)
         threads.each do |t|
           t.join
         end
@@ -206,7 +206,7 @@ describe HotTub::Pool do
         pool.instance_variable_set(:@current_size, 2)
         pool.send(:_reap_pool?).should be_true
         pool.instance_variable_get(:@reaper).wakeup # run the reaper thread
-        sleep(0.001) # let results
+        sleep(0.01) # let results
         pool.current_size.should eql(1)
         pool.instance_variable_get(:@pool).length.should eql(1)
       end
@@ -276,7 +276,7 @@ describe HotTub::Pool do
               }
             end
           end
-          sleep(0.001)
+          sleep(0.01)
           threads.each do |t|
             t.join
           end
@@ -290,7 +290,7 @@ describe HotTub::Pool do
               @pool.run{|connection| Thread.current[:status] = connection.head(uri.path).code }
             end
           end
-          sleep(0.001)
+          sleep(0.01)
           threads.each do |t|
             t.join
           end
@@ -301,20 +301,4 @@ describe HotTub::Pool do
       end
     end
   end
-  # describe "benchmark" do
-  #   @pool = HotTub::Pool.new {Object.new}
-  #   now = Time.now
-  #   threads = []
-  #   30000.times.each do
-  #     threads << Thread.new do
-  #       @pool.run{|conn|
-  #       }
-  #     end
-  #   end
-  #   sleep(0.001)
-  #   threads.each do |t|
-  #     t.join
-  #   end
-  #   puts Time.now - now
-  # end
 end
