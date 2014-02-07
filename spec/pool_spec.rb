@@ -59,7 +59,7 @@ describe HotTub::Pool do
         @connection = connection
       end
       # returned to pool after work was done
-      @pool.instance_variable_get(:@pool).pop.should eql(@connection)    
+      @pool.instance_variable_get(:@pool).pop.should eql(@connection)
     end
 
     it "should work" do
@@ -247,7 +247,7 @@ describe HotTub::Pool do
 
   context 'Net::Http' do
     before(:each) do
-      @pool = HotTub::Pool.new(:size => 10) { 
+      @pool = HotTub::Pool.new(:size => 10) {
         uri = URI.parse(HotTub::Server.url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = false
@@ -257,7 +257,7 @@ describe HotTub::Pool do
     end
     it "should work" do
       result = nil
-      @pool.run{|clnt| 
+      @pool.run{|clnt|
         uri = URI.parse(HotTub::Server.url)
         result = clnt.head(uri.path).code
       }
@@ -270,9 +270,9 @@ describe HotTub::Pool do
         lambda {
           15.times.each do
             threads << Thread.new do
-              @pool.run{|connection| 
+              @pool.run{|connection|
                 uri = URI.parse(HotTub::Server.url)
-                Thread.current[:status] = connection.head(uri.path).code 
+                Thread.current[:status] = connection.head(uri.path).code
               }
             end
           end
@@ -301,4 +301,20 @@ describe HotTub::Pool do
       end
     end
   end
+  # describe "benchmark" do
+  #   @pool = HotTub::Pool.new {Object.new}
+  #   now = Time.now
+  #   threads = []
+  #   30000.times.each do
+  #     threads << Thread.new do
+  #       @pool.run{|conn|
+  #       }
+  #     end
+  #   end
+  #   sleep(0.001)
+  #   threads.each do |t|
+  #     t.join
+  #   end
+  #   puts Time.now - now
+  # end
 end

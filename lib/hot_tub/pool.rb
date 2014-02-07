@@ -1,9 +1,10 @@
+require 'monitor'
 module HotTub
   class Pool
     include HotTub::KnownClients
     attr_reader :current_size, :last_activity
 
-    # Thread-safe lazy connection pool modeled after Queue
+    # Thread-safe lazy connection pool
     #
     # == Example Net::HTTP
     #     pool = HotTub::Pool.new(:size => 10) {
@@ -45,7 +46,7 @@ module HotTub
       @close            = opts[:close]                    # => lambda {|clnt| clnt.close}
       @clean            = opts[:clean]                    # => lambda {|clnt| clnt.clean}
       @never_block      = (opts[:never_block].nil? ? true : opts[:never_block]) # Return new client if we run out
-      @client_block = client_block
+      @client_block     = client_block
 
       @pool             = []    # stores available connection
       @pool.taint
@@ -53,12 +54,13 @@ module HotTub
       @register.taint
       @waiting          = []    # waiting threads
       @waiting.taint
-      @stale            = []    # stale/orphan connections to be reaped
-      @stale.taint      
-      @pool_mutex       = Mutex.new
+      @orphans          = []    # orphan connections to be reaped
+      @orphans.taint
+      
+      @monitor       = Monitor.new
+      @cond             = @monitor.new_cond
       @current_size     = 0
       @last_activity    = Time.now
-      @fetching_client  = false
       @reaper           = Thread.new {
         reap_pool
       }
@@ -82,7 +84,7 @@ module HotTub
     # but the close_client block ensures the client should be stale
     # and the clean method should repairs those connections if they are called
     def close_all
-      @pool_mutex.synchronize do
+      @monitor.synchronize do
         while clnt = @register.pop
           @pool.delete(clnt)
           begin
@@ -109,28 +111,20 @@ module HotTub
     def push(clnt)
       pushed = false
       reap = false
-      @pool_mutex.synchronize do
+      @monitor.synchronize do
         if @register.include?(clnt)
           pushed = true
           @register.delete(clnt)
           @register << clnt
           @pool << clnt
         end
-        begin
-          t = @waiting.shift
-          t.wakeup if t
-        rescue ThreadError
-          retry
-        end
         reap = _reap_pool?
+        @orphans << clnt unless pushed # orphan close
+        @cond.signal
       end
-      @stale << clnt unless pushed # orphan close
       nil # make sure never return the pool
     ensure
-      begin
-        @reaper.wakeup if reap
-      rescue ThreadError
-      end
+     wake_reaper if reap
     end
 
     def alarm_time
@@ -149,9 +143,9 @@ module HotTub
 
     # Safely pull client from pool, adding if allowed
     def pop
-      @fetching_client = true # kill reap_pool
       clnt = nil
-      @pool_mutex.synchronize do
+      @monitor.synchronize do
+        @last_activity = Time.now
         alarm = alarm_time
         while clnt.nil?
           raise_alarm if raise_alarm?(alarm)
@@ -159,39 +153,14 @@ module HotTub
             if _add? || @never_block
               clnt = _add(true)
             else
-              @waiting.push Thread.current
-              @pool_mutex.sleep(@blocking_timeout)
+              @cond.wait(@blocking_timeout)
             end
           else
             clnt = @pool.pop
           end
         end
-        @fetching_client = false
-        clnt
       end
-    end
-
-    # _reap_pool? is volatile; and may cause be inaccurate
-    # if called outside @pool_mutex.synchronize {}
-    def _reap_pool?
-      (!@fetching_client && (@current_size > @size) && ((@last_activity + (600)) < Time.now))
-    end
-
-    # Remove extra connections from front of pool
-    def reap_pool
-      @pool_mutex.synchronize do
-        while true
-          while stale = @stale.pop
-            close_client(stale)
-          end
-          while _reap_pool? && clnt = @pool.shift
-            @register.delete(clnt)
-            @current_size -= 1
-            close_client(clnt)
-          end
-          @pool_mutex.sleep
-        end
-      end
+      clnt
     end
 
     # Only want to add a client if the pool is empty in keeping with
@@ -204,7 +173,6 @@ module HotTub
     # _add is volatile; and may cause threading issues
     # if called outside @pool_mutex.synchronize {}
     def _add(no_pool=false)
-      @last_activity = Time.now
       @current_size += 1
       nc = @client_block.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
@@ -212,6 +180,36 @@ module HotTub
       return nc if no_pool
       @pool << nc
       nil
+    end
+
+    # _reap_pool? is volatile; and may cause be inaccurate
+    # if called outside @pool_mutex.synchronize {}
+    def _reap_pool?
+      ((@current_size > @size) && ((@last_activity + (600)) < Time.now))
+    end
+
+    # Remove extra connections from front of pool
+    def reap_pool
+      @monitor.synchronize do
+        loop do
+          while orphan = @orphans.pop
+            close_client(orphan)
+          end
+          while _reap_pool? && clnt = @pool.shift
+            @register.delete(clnt)
+            @current_size -= 1
+            close_client(clnt)
+          end
+          @monitor.sleep
+        end
+      end
+    end
+
+    def wake_reaper
+      begin
+        @reaper.wakeup if reap
+      rescue ThreadError
+      end
     end
   end
 
