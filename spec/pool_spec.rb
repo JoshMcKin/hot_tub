@@ -78,24 +78,21 @@ describe HotTub::Pool do
   describe '#close_all' do
     before(:each) do
       @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
-      5.times do
-        @pool.send(:_add)
-      end
     end
 
     it "should reset out" do
-      @pool.instance_variable_set(:@out, @pool.instance_variable_get(:@pool))
-      @pool.instance_variable_set(:@pool, [])
-      @pool.instance_variable_get(:@out).length.should eql(5)
-      @pool.send(:_current_size).should eql(5)
+      @pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
+      @pool.instance_variable_get(:@out).length.should eql(3)
+      @pool.send(:_current_size).should eql(3)
       @pool.close_all
       @pool.instance_variable_get(:@out).length.should eql(0)
       @pool.send(:_current_size).should eql(0)
     end
 
     it "should reset pool" do
-      @pool.send(:_current_size).should eql(5)
-      @pool.instance_variable_get(:@pool).length.should eql(5)
+      @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
+      @pool.instance_variable_get(:@pool).length.should eql(3)
+      @pool.send(:_current_size).should eql(3)
       @pool.close_all
       @pool.instance_variable_get(:@pool).length.should eql(0)
       @pool.send(:_current_size).should eql(0)
@@ -196,13 +193,13 @@ describe HotTub::Pool do
     end
   end
 
-  describe '#reap_pool' do
+  describe '#reap' do
     context 'current_size is greater than :size' do
       it "should remove a connection from the pool" do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         pool.instance_variable_set(:@last_activity,(Time.now - 601))
         pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new])
-        pool.send(:_reap_pool?).should be_true
+        pool.send(:_reap?).should be_true
         pool.instance_variable_get(:@reaper).wakeup # run the reaper thread
         sleep(0.1) # let results
         pool.send(:_current_size).should eql(1)
