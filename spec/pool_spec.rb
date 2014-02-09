@@ -83,20 +83,22 @@ describe HotTub::Pool do
       end
     end
 
-    it "should reset register" do
-      @pool.current_size.should eql(5)
-      @pool.instance_variable_get(:@register).length.should eql(5)
+    it "should reset out" do
+      @pool.instance_variable_set(:@out, @pool.instance_variable_get(:@pool))
+      @pool.instance_variable_set(:@pool, [])
+      @pool.instance_variable_get(:@out).length.should eql(5)
+      @pool.send(:_current_size).should eql(5)
       @pool.close_all
-      @pool.instance_variable_get(:@register).length.should eql(0)
-      @pool.current_size.should eql(0)
+      @pool.instance_variable_get(:@out).length.should eql(0)
+      @pool.send(:_current_size).should eql(0)
     end
 
     it "should reset pool" do
-      @pool.current_size.should eql(5)
+      @pool.send(:_current_size).should eql(5)
       @pool.instance_variable_get(:@pool).length.should eql(5)
       @pool.close_all
       @pool.instance_variable_get(:@pool).length.should eql(0)
-      @pool.current_size.should eql(0)
+      @pool.send(:_current_size).should eql(0)
     end
   end
 
@@ -150,13 +152,10 @@ describe HotTub::Pool do
           @pool.instance_variable_get(:@pool).include?(clnt).should be_true
         end
       end
-      context "connection is not registered" do
+      context "client is nil" do
         it "should not push connection back to pool" do
-          @pool.send(:_add)
-          clnt = @pool.instance_variable_get(:@pool).pop
-          @pool.instance_variable_get(:@register).delete(clnt)
-          @pool.send(:push,clnt)
-          @pool.instance_variable_get(:@pool).include?(clnt).should be_false
+          @pool.send(:push,nil)
+          @pool.instance_variable_get(:@pool).include?(nil).should be_false
         end
       end
     end
@@ -176,7 +175,7 @@ describe HotTub::Pool do
         threads.each do |t|
           t.join
         end
-        (pool.current_size > 1).should be_true
+        (pool.send(:_current_size) > 1).should be_true
       end
     end
     context 'is false' do
@@ -192,7 +191,7 @@ describe HotTub::Pool do
         threads.each do |t|
           t.join
         end
-        pool.current_size.should eql(1)
+        pool.send(:_current_size).should eql(1)
       end
     end
   end
@@ -203,11 +202,10 @@ describe HotTub::Pool do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         pool.instance_variable_set(:@last_activity,(Time.now - 601))
         pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new])
-        pool.instance_variable_set(:@current_size, 2)
         pool.send(:_reap_pool?).should be_true
         pool.instance_variable_get(:@reaper).wakeup # run the reaper thread
-        sleep(0.01) # let results
-        pool.current_size.should eql(1)
+        sleep(0.1) # let results
+        pool.send(:_current_size).should eql(1)
         pool.instance_variable_get(:@pool).length.should eql(1)
       end
     end

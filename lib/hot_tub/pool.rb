@@ -48,16 +48,13 @@ module HotTub
       @never_block      = (opts[:never_block].nil? ? true : opts[:never_block]) # Return new client if we run out
       @client_block     = client_block
 
-      @pool             = []    # stores available connection
+      @pool             = []    # stores available clients
       @pool.taint
-      @register         = []    # stores all connections at all times
-      @register.taint
-      @orphans          = []    # orphan connections to be reaped
-      @orphans.taint
-      
-      @monitor       = Monitor.new
+      @out              = []    # stores all checked out clients
+      @out.taint
+
+      @monitor          = Monitor.new
       @cond             = @monitor.new_cond
-      @current_size     = 0
       @last_activity    = Time.now
       @reaper           = Thread.new {
         reap_pool
@@ -83,15 +80,13 @@ module HotTub
     # and the clean method should repairs those connections if they are called
     def close_all
       @monitor.synchronize do
-        while clnt = @register.pop
-          @pool.delete(clnt)
+        while (clnt = @pool.pop || clnt = @out.pop)
           begin
             close_client(clnt)
           rescue => e
             HotTub.logger.error "There was an error close one of your HotTub::Pool connections: #{e}"
           end
         end
-        @current_size = 0
       end
     end
 
@@ -107,22 +102,17 @@ module HotTub
     # Safely add client back to pool, only if
     # that clnt is registered
     def push(clnt)
-      pushed = false
+      return false if clnt.nil?
       reap = false
       @monitor.synchronize do
-        if @register.include?(clnt)
-          pushed = true
-          @register.delete(clnt)
-          @register << clnt
-          @pool << clnt
-        end
+        @out.delete(clnt)
+        @pool << clnt
         reap = _reap_pool?
-        @orphans << clnt unless pushed # orphan close
         @cond.signal
       end
       nil # make sure never return the pool
     ensure
-     wake_reaper if reap
+      wake_reaper if reap
     end
 
     def alarm_time
@@ -142,11 +132,11 @@ module HotTub
     # Safely pull client from pool, adding if allowed
     def pop
       clnt = nil
-      @monitor.synchronize do
-        @last_activity = Time.now
-        alarm = alarm_time
-        while clnt.nil?
-          raise_alarm if raise_alarm?(alarm)
+      alarm = alarm_time
+      while clnt.nil?
+        raise_alarm if raise_alarm?(alarm)
+        @monitor.synchronize do
+          @last_activity = Time.now
           if (@pool.empty?)
             if _add? || @never_block
               clnt = _add(true)
@@ -156,56 +146,62 @@ module HotTub
           else
             clnt = @pool.pop
           end
+          @out << clnt if clnt
         end
       end
       clnt
+    end
+
+    def _current_size
+      (@pool.length + @out.length)
     end
 
     # Only want to add a client if the pool is empty in keeping with
     # a lazy model. _add? is volatile; and may cause be in accurate
     # if called outside @pool_mutex.synchronize {}
     def _add?
-      (@pool.length == 0 && (@size > @current_size))
+      (@pool.empty? && (@size > _current_size))
     end
 
     # _add is volatile; and may cause threading issues
     # if called outside @pool_mutex.synchronize {}
-    def _add(no_pool=false)
-      @current_size += 1
+    def _add(out=false)
       nc = @client_block.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
-      @register << nc
-      return nc if no_pool
-      @pool << nc
+      if out
+        @out << nc
+        return nc
+      else
+        @pool << nc
+      end
       nil
     end
 
     # _reap_pool? is volatile; and may cause be inaccurate
     # if called outside @pool_mutex.synchronize {}
     def _reap_pool?
-      ((@current_size > @size) && ((@last_activity + (600)) < Time.now))
+      (!@pool.empty? && (_current_size > @size) && ((@last_activity + (600)) < Time.now))
     end
 
     # Remove extra connections from front of pool
     def reap_pool
-      @monitor.synchronize do
-        loop do
-          while orphan = @orphans.pop
-            close_client(orphan)
+      reaped = []
+      loop do
+        @monitor.synchronize do
+          while _reap_pool?
+            reaped << @pool.shift
           end
-          while _reap_pool? && clnt = @pool.shift
-            @register.delete(clnt)
-            @current_size -= 1
-            close_client(clnt)
-          end
-          @monitor.sleep
         end
+        while clnt = reaped.pop
+          close_client(clnt)
+        end
+        @monitor.sleep
       end
     end
 
     def wake_reaper
       begin
-        @reaper.wakeup if reap
+        @reaper.wakeup
       rescue ThreadError
       end
     end
