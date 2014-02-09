@@ -18,7 +18,7 @@ module HotTub
     # Attempts to clean the provided client, checking the options first for a clean block
     # then checking the known clients
     def clean_client(clnt)
-      return @options[:clean].call(clnt) if @options && @options[:clean] && @options[:clean].is_a?(Proc)
+      return @clean.call(clnt) if @clean && @clean.is_a?(Proc)
       if settings = KNOWN_CLIENTS[clnt.class.name]
         settings[:clean].call(clnt) if settings[:clean].is_a?(Proc)
       end
@@ -27,7 +27,7 @@ module HotTub
     # Attempts to close the provided client, checking the options first for a close block
     # then checking the known clients
     def close_client(clnt)
-      return @options[:close].call(clnt) if @options && @options[:close] && @options[:close].is_a?(Proc)
+      return @close.call(clnt) if @close && @close.is_a?(Proc)
       if settings = KNOWN_CLIENTS[clnt.class.name]
         begin
           settings[:close].call(clnt) if settings[:close].is_a?(Proc)
