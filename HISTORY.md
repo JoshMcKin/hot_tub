@@ -4,8 +4,9 @@ HotTub Changelog
 HEAD
 =======
 
-- Rename unsafe methods with leading "_"
-- Add register to pool to track all connections
-- Use ThreadSafe::Cache for threaded sessions
 - Drop EM support, will move to separate gem
+- Simplify API with HotTub.new
+- Use ThreadSafe::Cache for threaded sessions
+- Use Monitor in Pool
 - Test and doc with Net::HTTP
+- Place reaping in worker thread
