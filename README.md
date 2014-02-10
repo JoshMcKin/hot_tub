@@ -76,7 +76,7 @@ with lambdas, if they are not defined they are ignored.
     hot_tub.run { |clnt| clnt.get(url,query).body }
 
 ## Pool only
-Returns a HotTub::Pool
+Returns a HotTub::Pool instance.
 
     require 'hot_tub'
     require 'net/http'
@@ -91,7 +91,7 @@ Returns a HotTub::Pool
 
  
 ## Sessions only
-Returns a HotTub::Sessions. 
+Returns a HotTub::Sessions instance. 
 
 [Excon](https://github.com/geemus/excon) is thread safe but you set a single url at the client level so sessions 
 are handy if you need to access multiple URLs from a single instances
