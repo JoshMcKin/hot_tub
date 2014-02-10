@@ -62,7 +62,7 @@ module HotTub
                             Thread.current["name"] = "pool_reaper"
                             reap
                           }
-      at_exit {close_all}
+      at_exit {close_all;@reaper.kill}
     end
 
     # Hand off to client.run
@@ -82,6 +82,7 @@ module HotTub
     # but the close_client block ensures the client should be stale
     # and the clean method should repairs those clients if they are called
     def close_all
+      update_last_activity
       @monitor.synchronize do
         while (clnt = @pool.pop || clnt = @out.pop)
           begin
@@ -102,15 +103,21 @@ module HotTub
       clnt
     end
 
+    # Updating last activity causes the reaper
+    # to unlock the monitor
+    def update_last_activity
+      @last_activity = Time.now
+    end
+
     # Safely add client back to pool, only if
     # that clnt is registered
     def push(clnt)
       if clnt
+        update_last_activity
         @monitor.synchronize do
           @out.delete(clnt)
           @pool << clnt
           @cond.signal
-          wake_reaper if _reap?
         end
       end
       nil
@@ -146,10 +153,10 @@ module HotTub
     def pop
       clnt = nil
       alarm = alarm_time
+      update_last_activity
       while clnt.nil?
         raise_alarm if raise_alarm?(alarm)
         @monitor.synchronize do
-          @last_activity = Time.now
           if (_available? || _add)
             @out << clnt = @pool.pop
           else
@@ -168,7 +175,7 @@ module HotTub
     # a lazy model. _add? is volatile; and may cause be in accurate
     # if called outside @monitor.synchronize {}
     def _add?
-      (_empty? && (@never_block || (@size > _current_size)))
+      (_empty? && (@never_block || (_current_size < @size)))
     end
 
     # _add is volatile; and may cause threading issues
@@ -199,14 +206,7 @@ module HotTub
         while clnt = reaped.pop
           close_client(clnt)
         end
-        @monitor.sleep
-      end
-    end
-
-    def wake_reaper
-      begin
-        @reaper.wakeup
-      rescue ThreadError
+        @monitor.sleep(@reap_timeout)
       end
     end
   end
