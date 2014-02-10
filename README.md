@@ -45,7 +45,9 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
 
 ## HotTub
 Returns a instance of HotTub::Sessions with HotTub::Pool as the session client
-    
+
+### Net::HTTP
+
     require 'hot_tub'
     require 'net/http'
 
@@ -65,8 +67,15 @@ Returns a instance of HotTub::Sessions with HotTub::Pool as the session client
       puts clnt.head('/').code
     end
 
+### Other
+You can use any library you want with HotTub::Pool. Close and clean can be defined at initialization 
+with lambdas, if they are not defined they are ignored.
+
+    url = "http://test12345.com"
+    hot_tub = HotTub.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
+    hot_tub.run { |clnt| clnt.get(url,query).body }
+
 ## Pool only
-### Net::HTTP
 Returns a HotTub::Pool
 
     require 'hot_tub'
@@ -80,13 +89,6 @@ Returns a HotTub::Pool
       }
     pool.run {|clnt| puts clnt.head('/').code }
 
-### Other
-You can use any library you want with HotTub::Pool. Close and clean can be defined at initialization 
-with lambdas, if they are not defined they are ignored.
-
-    url = "http://test12345.com"
-    pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
-    pool.run { |clnt| clnt.get(url,query).body }
  
 ## Sessions only
 Returns a HotTub::Sessions
