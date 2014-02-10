@@ -71,7 +71,7 @@ Returns a HotTub::Pool
 
     require 'hot_tub'
     require 'net/http'
-    pool = HotTub.new(:size => 10, :session => false) { 
+    pool = HotTub.new(:size => 10, :sessions => false) { 
       uri = URI.parse("http://somewebservice.com")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
