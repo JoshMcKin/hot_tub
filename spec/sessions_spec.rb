@@ -1,19 +1,19 @@
 require 'spec_helper'
-require 'hot_tub/session'
+require 'hot_tub/sessions'
 require 'uri'
 require 'time'
 describe HotTub::Session do
 
   context 'initialized without a block' do
     it "should raise error if block is not supplied" do
-      lambda {HotTub::Session.new}.should raise_error(ArgumentError)
+      lambda {HotTub::Sessions.new}.should raise_error(ArgumentError)
     end
   end
   context 'initialized with a block' do
     before(:each) do
       @url = "https://www.somewebsite.com"
       @uri = URI(@url)
-      @sessions = HotTub::Session.new { |url| MocClient.new(url) }
+      @sessions = HotTub::Sessions.new { |url| MocClient.new(url) }
     end
 
     describe '#to_url' do
@@ -42,7 +42,7 @@ describe HotTub::Session do
     describe '#sessions' do
       context 'HotTub::Pool as client' do
         it "should add a new client for the url" do
-          with_pool_options = HotTub::Session.new { |url| HotTub::Pool.new(:size => 13) { MocClient.new(url) } }
+          with_pool_options = HotTub::Sessions.new { |url| HotTub::Pool.new(:size => 13) { MocClient.new(url) } }
           with_pool_options.sessions(@url)
           sessions = with_pool_options.instance_variable_get(:@sessions)
           sessions.size.should eql(1)
@@ -52,7 +52,7 @@ describe HotTub::Session do
 
       context 'other clients' do
         it "should add a new client for the url" do
-          no_pool = HotTub::Session.new { |url| Excon.new(url) }
+          no_pool = HotTub::Sessions.new { |url| Excon.new(url) }
           no_pool.sessions(@url)
           sessions = no_pool.instance_variable_get(:@sessions)
           sessions.size.should eql(1)
@@ -77,7 +77,7 @@ describe HotTub::Session do
 
       context "with_pool" do
         it "should initialize a new HotTub::Pool" do
-          session_with_pool = HotTub::Session.new({:with_pool => true})  { |url| MocClient.new(url) }
+          session_with_pool = HotTub::Sessions.new({:with_pool => true})  { |url| MocClient.new(url) }
           pool = session_with_pool.sessions(@url)
           pool.should be_a(HotTub::Pool)
         end
@@ -87,7 +87,7 @@ describe HotTub::Session do
     describe '#run' do
       it "should work" do
         url = HotTub::Server.url
-        sessions = HotTub::Session.new { |url| Excon.new(url) }
+        sessions = HotTub::Sessions.new { |url| Excon.new(url) }
         result = nil
         sessions.run(url) do |conn|
           result = conn.get.status
@@ -98,7 +98,7 @@ describe HotTub::Session do
       context "with_pool" do
         it "should pass run to pool" do
           url = HotTub::Server.url
-          session_with_pool = HotTub::Session.new({:with_pool => true})  { |url|
+          session_with_pool = HotTub::Sessions.new({:with_pool => true})  { |url|
             uri = URI.parse(url)
             http = Net::HTTP.new(uri.host, uri.port)
             http.use_ssl = false
@@ -119,7 +119,7 @@ describe HotTub::Session do
       it "should work" do
         url = HotTub::Server.url
         url2 = HotTub::Server2.url
-        session = HotTub::Session.new(:with_pool => true) { |url|
+        session = HotTub::Sessions.new(:with_pool => true) { |url|
             uri = URI.parse(url)
             http = Net::HTTP.new(uri.host, uri.port)
             http.use_ssl = false

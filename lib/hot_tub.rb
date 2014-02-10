@@ -4,7 +4,7 @@ require 'logger'
 require "hot_tub/version"
 require "hot_tub/known_clients"
 require "hot_tub/pool"
-require "hot_tub/session"
+require "hot_tub/sessions"
 
 module HotTub
   @@logger = Logger.new(STDOUT)
@@ -22,5 +22,14 @@ module HotTub
 
   def self.rbx?
     defined?(RUBY_ENGINE) and RUBY_ENGINE == 'rbx'
+  end
+
+  def self.new(opts={},&client_block)
+    if opts[:sessions] == false
+      Pool.new(opts,&client_block)
+    else
+      opts[:with_pool] = true unless opts[:pool] == false
+      Session.new(opts,&client_block)
+    end
   end
 end

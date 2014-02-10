@@ -5,6 +5,8 @@ A simple thread-safe connection pool and sessions gem.
 ## Features
 
 ### HotTub::Pool
+A thread safe lazy pool for HTTP clients or anything else you can think of.
+
 * Thread safe
 * Lazy clients/connections (created only when necessary)
 * Can be used with any client library
@@ -12,11 +14,8 @@ A simple thread-safe connection pool and sessions gem.
 * Set to expand pool under load that is eventually reaped back down to set size (never_block), can be disabled
 * Attempts to close clients/connections on shutdown
 
-### HotTub::Session
-* Thread safe
-* The same api as HotTub::Pool
-* Can be used with HotTub::Pool or any client library 
-* Attempts to close clients/connections on shutdown
+### HotTub::Sessions
+A [ThreadSafe::Cache](https://github.com/headius/thread_safe) where URLs are mapped to a pool or client instance.
 
 ## Requirements
 HotTub is tested on MRI, JRUBY and Rubinius
@@ -44,12 +43,35 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
 
 # Usage 
 
-## HotTub::Pool
-
-### Net::HTTP
+## HotTub
+Returns a instance of HotTub::Sessions with HotTub::Pool as the session client
+    
     require 'hot_tub'
     require 'net/http'
-    pool = HotTub::Pool.new(:size => 10) { 
+
+    # We must pass any pool options in our options hash, and our client block 
+    # must accept the a single argument which is normally the url
+    hot_tub = HotTub.new(:size => 12) { |url| 
+      uri = URI.parse(url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = false
+      http.start
+      http 
+    }
+    hot_tub.run("http://somewebservice.com") do |clnt|    
+      puts clnt.head('/').code
+    end
+    hot_tub.run("https://someotherwebservice.com") do |clnt|    
+      puts clnt.head('/').code
+    end
+
+## Pool only
+### Net::HTTP
+Returns a HotTub::Pool
+
+    require 'hot_tub'
+    require 'net/http'
+    pool = HotTub.new(:size => 10, :session => false) { 
       uri = URI.parse("http://somewebservice.com")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
@@ -66,15 +88,15 @@ with lambdas, if they are not defined they are ignored.
     pool = HotTub::Pool.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
     pool.run { |clnt| clnt.get(url,query).body }
  
-## HotTub::Session
-HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools. 
-For example, [Excon](https://github.com/geemus/excon) is thread safe but you set a single url at the client level so sessions 
-are handy if you need to access multiple urls but would prefer a single object.
+## Sessions only
+Returns a HotTub::Sessions
+[Excon](https://github.com/geemus/excon) is thread safe but you set a single url at the client level so sessions 
+are handy if you need to access multiple URLs from a single instances
     
     require 'hot_tub'
     require 'excon'
     # Our client block must accept the url argument
-    sessions = HotTub::Session.new {|url| Excon.new(url) }
+    sessions = HotTub.new(:pool => false) {|url| Excon.new(url) }
 
     sessions.run("http://somewebservice.com") do |clnt|    
       puts clnt.get(:query => {:some => 'stuff'}).response_header.status
@@ -82,28 +104,6 @@ are handy if you need to access multiple urls but would prefer a single object.
 
     sessions.run("https://someotherwebservice.com") do |clnt|    
       puts clnt.get(:query => {:other => 'stuff'}).response_header.status
-    end
-
-### HotTub::Session with HotTub::Pool
-Suppose you have a client that lacks pooling and session features you can use HotTub::Pool with HotTub::Sessions to get what you need.
-    
-    require 'hot_tub'
-    require 'net/http'
-
-    # We must tell HotTub::Session to use HotTub::Pool, pass any pool options in our 
-    # options has, and our client block must accept the url argument
-    sessions = HotTub::Session.new(:with_pool => true, :size => 12) { |url| 
-      uri = URI.parse(url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = false
-      http.start
-      http 
-    }
-    sessions.run("http://somewebservice.com") do |clnt|    
-      puts clnt.head('/').code
-    end
-    sessions.run("https://someotherwebservice.com") do |clnt|    
-      puts clnt.head('/').code
     end
 
 ## Other Pooling Gem

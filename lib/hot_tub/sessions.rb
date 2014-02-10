@@ -1,7 +1,6 @@
 require 'uri'
 module HotTub
-
-  class Session
+  class Sessions
     include HotTub::KnownClients
     # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools. 
     # Excon clients are initialized to a specific domain, so we sometimes need a way to
@@ -9,7 +8,7 @@ module HotTub
     # you choose, but make sure you client is thread safe.
     # Example:
     #
-    #   sessions = HotTub::Session.new { |url| Excon.new(url) }
+    #   sessions = HotTub::Sessions.new { |url| Excon.new(url) }
     #
     #   sessions.run("http://wwww.yahoo.com") do |conn|
     #     p conn.head.status
@@ -21,14 +20,20 @@ module HotTub
     #
     # Example with Pool:
     # You can initialize a HotTub::Pool with each client by passing :with_pool as true and any pool options
-    #   sessions = HotTub::Session.new(:with_pool => true, :size => 12) { EM::HttpRequest.new("http://somewebservice.com") }
+    #   sessions = HotTub::Sessions.new(:with_pool => true, :size => 12) {
+    #       uri = URI.parse("http://somewebservice.com")
+    #       http = Net::HTTP.new(uri.host, uri.port)
+    #       http.use_ssl = false
+    #       http.start
+    #       http
+    #     }
     #
     #   sessions.run("http://wwww.yahoo.com") do |conn|
-    #     p conn.head.response_header.status
+    #     p conn.head('/').code
     #   end
     #
     #   sessions.run("https://wwww.google.com") do |conn|
-    #     p conn.head.response_header.status
+    #     p conn.head('/').code
     #   end
     #
     def initialize(opts={},&client_block)
@@ -90,4 +95,5 @@ module HotTub
       "#{uri.scheme}://#{uri.host}:#{uri.port}"
     end
   end
+  Session = Sessions # alias for backwards compatibility
 end
