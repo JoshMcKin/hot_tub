@@ -91,7 +91,8 @@ Returns a HotTub::Pool
 
  
 ## Sessions only
-Returns a HotTub::Sessions
+Returns a HotTub::Sessions. 
+
 [Excon](https://github.com/geemus/excon) is thread safe but you set a single url at the client level so sessions 
 are handy if you need to access multiple URLs from a single instances
     
