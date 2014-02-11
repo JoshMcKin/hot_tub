@@ -62,7 +62,7 @@ module HotTub
                             Thread.current["name"] = "pool_reaper"
                             reap
                           }
-      at_exit {close_all;@reaper.kill}
+      at_exit {close_all}
     end
 
     # Hand off to client.run
