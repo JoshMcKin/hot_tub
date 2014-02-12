@@ -15,7 +15,7 @@ describe HotTub::Pool do
     end
 
     it "should have set the client" do
-      @pool.instance_variable_get(:@client_block).call.should be_a(MocClient)
+      @pool.instance_variable_get(:@new_client).call.should be_a(MocClient)
     end
 
     it "should be true" do
@@ -75,7 +75,7 @@ describe HotTub::Pool do
     end
   end
 
-  describe '#close_all' do
+  describe '#drain!' do
     before(:each) do
       @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
     end
@@ -84,7 +84,7 @@ describe HotTub::Pool do
       @pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
       @pool.instance_variable_get(:@out).length.should eql(3)
       @pool.send(:_current_size).should eql(3)
-      @pool.close_all
+      @pool.drain!
       @pool.instance_variable_get(:@out).length.should eql(0)
       @pool.send(:_current_size).should eql(0)
     end
@@ -93,7 +93,53 @@ describe HotTub::Pool do
       @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
       @pool.instance_variable_get(:@pool).length.should eql(3)
       @pool.send(:_current_size).should eql(3)
-      @pool.close_all
+      @pool.drain!
+      @pool.instance_variable_get(:@pool).length.should eql(0)
+      @pool.send(:_current_size).should eql(0)
+    end
+  end
+
+  describe '#clean' do
+    before(:each) do
+      @pool = HotTub::Pool.new(:size => 5, :clean => lambda { |clnt| clnt.clean}) { MocClient.new }
+    end
+
+    it "should clean pool" do
+      @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
+      @pool.instance_variable_get(:@pool).first.cleaned?.should be_false
+      @pool.clean
+      @pool.instance_variable_get(:@pool).each do |clnt|
+        clnt.cleaned?.should be_true
+      end
+    end
+  end
+
+   describe '#shutdown!' do
+    before(:each) do
+      @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
+    end
+
+    it "should kill reaper" do
+      @pool.instance_variable_get(:@reaper).status.should eql("run")
+      @pool.shutdown!
+      sleep(0.01)
+      @pool.instance_variable_get(:@reaper).status.should be_false
+    end
+
+    it "should reset out" do
+      @pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
+      @pool.instance_variable_get(:@out).length.should eql(3)
+      @pool.send(:_current_size).should eql(3)
+      @pool.shutdown!
+      @pool.instance_variable_get(:@out).length.should eql(0)
+      @pool.send(:_current_size).should eql(0)
+    end
+
+    it "should reset pool" do
+      @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
+      @pool.instance_variable_get(:@pool).length.should eql(3)
+      @pool.send(:_current_size).should eql(3)
+      @pool.shutdown!
       @pool.instance_variable_get(:@pool).length.should eql(0)
       @pool.send(:_current_size).should eql(0)
     end
@@ -198,12 +244,14 @@ describe HotTub::Pool do
       it "should remove a connection from the pool" do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         pool.instance_variable_set(:@last_activity,(Time.now - 601))
-        pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new])
+        pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
         pool.send(:_reap?).should be_true
+        pool.instance_variable_get(:@reaper).status.should eql('run')
         pool.instance_variable_get(:@reaper).wakeup # run the reaper thread
         sleep(0.1) # let results
         pool.send(:_current_size).should eql(1)
         pool.instance_variable_get(:@pool).length.should eql(1)
+        pool.instance_variable_get(:@reaper).status.should eql('sleep')
       end
     end
   end
@@ -296,4 +344,28 @@ describe HotTub::Pool do
       end
     end
   end
+
+  # context 'thread safety' do
+  #   it "should work" do
+  #     pool = HotTub::Pool.new({:size => 5}) { MocClient.new }
+  #     failed = false
+  #     3.times do
+  #       now = Time.now
+  #       threads = []
+  #       40.times do
+  #         100.times.each do
+  #           threads << Thread.new do
+  #             pool.run{|connection| sleep(0.001)}
+  #           end
+  #         end
+  #         sleep(0.01)
+  #         threads.each do |t|
+  #           t.join
+  #         end
+  #       end
+  #       puts Time.now - now
+  #     end
+  #   end
+  # end
+
 end

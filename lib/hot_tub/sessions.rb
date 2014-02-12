@@ -36,15 +36,16 @@ module HotTub
     #     p conn.head('/').code
     #   end
     #
-    def initialize(opts={},&client_block)
+    def initialize(opts={},&new_client)
       raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
-      @options          = opts
-      @with_pool        = opts[:with_pool]        # true to use HotTub::Pool with supplied client
-      @close            = opts[:close]            # => lambda {|clnt| clnt.close}
-      @clean            = opts[:clean]            # => lambda {|clnt| clnt.clean}
-      @client_block     = client_block
+      @options          = opts                    # To pass to pool
+      @with_pool        = opts[:with_pool]        # Set to true to use HotTub::Pool with supplied new_client block
+      @close_client     = opts[:close]            # => lambda {|clnt| clnt.close}
+      @clean_client     = opts[:clean]            # => lambda {|clnt| clnt.clean}
+      @reap_client      = opts[:reap]             # => lambda {|clnt| clnt.reap?} # should return boolean
+      @new_client       = new_client              # => { |url| MyClient.new(url) } # block that accepts a url param
       @sessions         = ThreadSafe::Cache.new
-      at_exit {close_all}
+      at_exit {drain!}
     end
 
     # Synchronizes initialization of our sessions
@@ -53,9 +54,9 @@ module HotTub
       key = to_key(url)
       return @sessions[key] if @sessions[key]
       if @with_pool
-        @sessions[key] = HotTub::Pool.new(@options) { @client_block.call(url) }
+        @sessions[key] = HotTub::Pool.new(@options) { @new_client.call(url) }
       else
-        @sessions[key] = @client_block.call(url) if @sessions[key].nil?
+        @sessions[key] = @new_client.call(url) if @sessions[key].nil?
       end
       @sessions[key]
     end
@@ -66,17 +67,33 @@ module HotTub
       block.call(sessions(url))
     end
 
-    # Calls close on all pools/clients in sessions
-    def close_all
+    def clean
       @sessions.each_pair do |key,clnt|
         if clnt.is_a?(HotTub::Pool)
-          clnt.close_all
+          clnt.clean
         else
-          begin
-            close_client(clnt)
-          rescue => e
-            HotTub.logger.error "There was an error close one of your HotTub::Session clients: #{e}"
-          end
+          clean_client(clnt)
+        end
+      end
+    end
+
+    def drain!
+      @sessions.each_pair do |key,clnt|
+        if clnt.is_a?(HotTub::Pool)
+          clnt.drain!
+        else
+          close_client(clnt)
+        end
+        @sessions[key] = nil
+      end
+    end
+
+    def shutdown!
+      @sessions.each_pair do |key,clnt|
+        if clnt.is_a?(HotTub::Pool)
+          clnt.shutdown!
+        else
+          close_client(clnt)
         end
         @sessions[key] = nil
       end

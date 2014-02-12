@@ -1,4 +1,3 @@
-require 'monitor'
 module HotTub
   class Pool
     include HotTub::KnownClients
@@ -38,31 +37,32 @@ module HotTub
     #       puts "Our pool ran out: {e}"
     #     end
     #
-    def initialize(opts={},&client_block)
+    def initialize(opts={},&new_client)
       raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
 
       @size             = (opts[:size] || 5)                # in seconds
       @blocking_timeout = (opts[:blocking_timeout] || 10)   # in seconds
       @never_block      = (opts[:never_block].nil? ? true : opts[:never_block]) # Return new client if we run out
-      @reap_timeout     = (opts[:reap_timeout] || 600) # the interval to reap connections in seconds
+      @reap_timeout     = (opts[:reap_timeout] || 600)      # the interval to reap connections in seconds
 
-      @close            = opts[:close]                    # => lambda {|clnt| clnt.close}
-      @clean            = opts[:clean]                    # => lambda {|clnt| clnt.clean}
-      @client_block     = client_block
+      @close_client     = opts[:close]                    # => lambda {|clnt| clnt.close}
+      @clean_client     = opts[:clean]                    # => lambda {|clnt| clnt.clean}
+      @reap_client      = opts[:reap]                     # => lambda {|clnt| clnt.reap?} # should return boolean
+      @new_client       = new_client
 
       @pool             = []    # stores available clients
       @pool.taint
       @out              = []    # stores all checked out clients
       @out.taint
 
-      @monitor          = Monitor.new
-      @cond             = @monitor.new_cond
-      @last_activity    = Time.now
-      @reaper           = Thread.new {
-                            Thread.current["name"] = "pool_reaper"
-                            reap
-                          }
-      at_exit {close_all}
+      @mutex            = Mutex.new
+      @cond             = ConditionVariable.new
+  
+      @reaper           = Reaper.spawn { reap } # Spawn a new reaper for our pool
+      @shutdown         = false                 # Kills reaper when true
+      @last_activity    = Time.now              # Repear unlocks mutex when updated
+
+      at_exit {shutdown!}
     end
 
     # Hand off to client.run
@@ -77,21 +77,34 @@ module HotTub
       push(clnt) if clnt
     end
 
-    # Calls close on all clients and reset the pools
-    # Its possible clients may be returned to the pool after close_all,
-    # but the close_client block ensures the client should be stale
-    # and the clean method should repairs those clients if they are called
-    def close_all
+    # Clean all clients currently checked into the pool.
+    # Its possible clients may be returned to the pool after cleaning
+    def clean
       update_last_activity
-      @monitor.synchronize do
-        while (clnt = @pool.pop || clnt = @out.pop)
-          begin
-            close_client(clnt)
-          rescue => e
-            HotTub.logger.error "There was an error close one of your HotTub::Pool clients: #{e}"
-          end
+      @mutex.synchronize do
+        @pool.each do |clnt|
+          clean_client(clnt)
         end
       end
+    end
+
+    # Drain the pool of all clients currently checked into the pool.
+    # Its possible clients may be returned to the pool after draining
+    def drain!
+      update_last_activity
+      @mutex.synchronize do
+        while (clnt = @pool.pop || clnt = @out.pop)
+          close_client(clnt)
+        end
+      end
+    end
+    alias :close! :drain!
+    alias :close_all! :drain!
+
+    # Kills the reaper and drains the pool.
+    def shutdown!
+      @shutdown = true
+      drain!
     end
 
     private
@@ -114,7 +127,7 @@ module HotTub
     def push(clnt)
       if clnt
         update_last_activity
-        @monitor.synchronize do
+        @mutex.synchronize do
           @out.delete(clnt)
           @pool << clnt
           @cond.signal
@@ -145,7 +158,7 @@ module HotTub
 
     # _available? is volatile; and may cause be inaccurate
     # if called outside @monitor.synchronize {}
-    def _available?
+    def _space?
       !_empty?
     end
 
@@ -156,11 +169,11 @@ module HotTub
       update_last_activity
       while clnt.nil?
         raise_alarm if raise_alarm?(alarm)
-        @monitor.synchronize do
-          if (_available? || _add)
+        @mutex.synchronize do
+          if (_space? || _add)
             @out << clnt = @pool.pop
           else
-            @cond.wait(@blocking_timeout)
+            @cond.wait(@mutex)
           end
         end
       end
@@ -182,7 +195,7 @@ module HotTub
     # if called outside @monitor.synchronize {}
     def _add
       return false unless _add?
-      nc = @client_block.call
+      nc = @new_client.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
       @pool << nc
       true
@@ -191,14 +204,18 @@ module HotTub
     # _reap_pool? is volatile; and may cause be inaccurate
     # if called outside @monitor.synchronize {}
     def _reap?
-      (_available? && (_current_size > @size) && ((@last_activity + (@reap_timeout)) < Time.now))
+      (_space? && !@shutdown && ( _overflow_expired? || reap_client?(@pool[0])))
+    end
+
+    def _overflow_expired?
+      (_current_size > @size) && ((@last_activity + (@reap_timeout)) < Time.now)
     end
 
     # Remove and close extra clients after reap_timeout
     def reap
       reaped = []
       loop do
-        @monitor.synchronize do
+        @mutex.synchronize do
           while _reap?
             reaped << @pool.shift
           end
@@ -206,7 +223,17 @@ module HotTub
         while clnt = reaped.pop
           close_client(clnt)
         end
-        @monitor.sleep(@reap_timeout)
+        break if @shutdown
+        sleep(@reap_timeout)
+      end
+    end
+
+    class Reaper
+      def self.spawn
+        Thread.new {
+          Thread.current["name"] = "pool_reaper"
+          yield
+        }
       end
     end
   end
