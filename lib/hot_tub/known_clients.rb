@@ -24,7 +24,7 @@ module HotTub
           settings[:clean].call(clnt) if settings[:clean].is_a?(Proc)
         end
       rescue => e
-        HotTub.logger.error "There was an error cleaning one of your HotTub::Pool clients: #{e}"
+        HotTub.logger.error "There was an error cleaning one of your #{self.class.name} clients: #{e}"
       end
     end
 
@@ -36,7 +36,7 @@ module HotTub
         begin
           settings[:close].call(clnt) if settings[:close].is_a?(Proc)
         rescue => e
-          HotTub.logger.error "There was an error closing one of your #{self.class.name} connections: #{e}"
+          HotTub.logger.error "There was an error closing one of your #{self.class.name} clients: #{e}"
         end
       end
     end
@@ -48,7 +48,7 @@ module HotTub
         begin
           settings[:reap].call(clnt) if settings[:reap].is_a?(Proc)
         rescue => e
-          HotTub.logger.error "There was an error closing one of your #{self.class.name} connections: #{e}"
+          HotTub.logger.error "There was an error reaping one of your #{self.class.name} clients: #{e}"
         end
       end
       return false

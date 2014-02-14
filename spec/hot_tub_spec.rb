@@ -5,7 +5,7 @@ describe HotTub do
     describe '#new' do
     	
       it "should return a HotTub::Session" do
-        (HotTub.new { |url| MocClient.new(url) }).should be_a(HotTub::Session)
+        (HotTub.new { |url| MocClient.new(url) }).should be_a(HotTub::Sessions)
       end
 
       it "should be a HotTub::Sessions with HotTub::Pool as client" do

@@ -1,5 +1,6 @@
 class MocClient
   def initialize(url=nil,options={})
+    @reaped = false
     @close = false
     @clean = false
   end
@@ -7,7 +8,6 @@ class MocClient
   # Perform an IO
   def get
     sleep(self.class.sleep_time)
-    "that was slow IO"
   end
 
   def close
@@ -26,9 +26,17 @@ class MocClient
     @clean == true
   end
 
+  def reap
+    @reaped = true
+  end
+
+  def reaped?
+    @reaped
+  end
+
   class << self
     def sleep_time
-      0.2
+      0.1
     end
   end
 end

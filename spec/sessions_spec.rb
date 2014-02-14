@@ -2,7 +2,7 @@ require 'spec_helper'
 require 'hot_tub/sessions'
 require 'uri'
 require 'time'
-describe HotTub::Session do
+describe HotTub::Sessions do
 
   context 'initialized without a block' do
     it "should raise error if block is not supplied" do
@@ -115,39 +115,108 @@ describe HotTub::Session do
       end
     end
 
-    context 'threads' do
-      it "should work" do
-        url = HotTub::Server.url
-        url2 = HotTub::Server2.url
-        session = HotTub::Sessions.new(:with_pool => true) { |url|
+    describe '#clean!' do
+      it "should clean all sessions" do
+        sessions = HotTub::Sessions.new(:clean => lambda { |clnt| clnt.clean}) { |url| MocClient.new(url) }
+        sessions.sessions('foo')
+        sessions.sessions('bar')
+        sessions.clean!
+        sessions.instance_variable_get(:@sessions).each_pair do |k,v|
+          v.cleaned?.should be_true
+        end
+      end
+      context "with_pool" do
+        it "should clean all pools in sessions" do
+          sessions = HotTub::Sessions.new(:with_pool => true, :clean => lambda { |clnt| clnt.clean}) { |url| MocClient.new(url) }
+          sessions.sessions('foo')
+          sessions.sessions('bar')
+          sessions.clean!
+          sessions.instance_variable_get(:@sessions).each_pair do |k,v|
+            v.instance_variable_get(:@pool).each do |c|
+              c.cleaned?.should be_true
+            end
+          end
+        end
+      end
+    end
+
+    describe '#drain!' do
+      it "should drain all sessions" do
+        sessions = HotTub::Sessions.new { |url| MocClient.new(url) }
+        sessions.sessions('foo')
+        sessions.sessions('bar')
+        sessions.drain!
+        sessions.instance_variable_get(:@sessions).empty?.should be_true
+      end
+      context "with_pool" do
+        it "should drain all pools in sessions" do
+          sessions = HotTub::Sessions.new(:with_pool => true) { |url| MocClient.new(url) }
+          sessions.sessions('foo')
+          sessions.sessions('bar')
+          sessions.drain!
+          sessions.instance_variable_get(:@sessions).empty?.should be_true
+        end
+      end
+    end
+
+    describe '#reap!' do
+      it "should clean all sessions" do
+        sessions = HotTub::Sessions.new(:reap => lambda { |clnt| clnt.reap}) { |url| MocClient.new(url) }
+        sessions.sessions('foo')
+        sessions.sessions('bar')
+        sessions.reap!
+        sessions.instance_variable_get(:@sessions).each_pair do |k,v|
+          v.reaped?.should be_true
+        end
+      end
+      context "with_pool" do
+        it "should clean all pools in sessions" do
+          sessions = HotTub::Sessions.new(:with_pool => true, :reap => lambda { |clnt| clnt.reap}) { |url| MocClient.new(url) }
+          sessions.sessions('foo')
+          sessions.sessions('bar')
+          sessions.reap!
+          sessions.instance_variable_get(:@sessions).each_pair do |k,v|
+            v.instance_variable_get(:@pool).each do |c|
+              c.reaped?.should be_true
+            end
+          end
+        end
+      end
+    end
+    context 'integration tests' do
+      context 'threads' do
+        it "should work" do
+          url = HotTub::Server.url
+          url2 = HotTub::Server2.url
+          session = HotTub::Sessions.new(:with_pool => true) { |url|
             uri = URI.parse(url)
             http = Net::HTTP.new(uri.host, uri.port)
             http.use_ssl = false
             http.start
             http
           }
-        failed = false
-        start_time = Time.now
-        stop_time = nil
-        threads = []
-        lambda {
-          10.times.each do
-            threads << Thread.new do
-              session.run(url)  { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
-              session.run(url2) { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
+          failed = false
+          start_time = Time.now
+          stop_time = nil
+          threads = []
+          lambda {
+            10.times.each do
+              threads << Thread.new do
+                session.run(url)  { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
+                session.run(url2) { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
+              end
             end
-          end
-          threads.each do |t|
-            t.join
-          end
-          stop_time = Time.now
-        }.should_not raise_error # make sure we're thread safe
-        # Some extra checks just to make sure...
-        results = threads.collect{ |t| t[:result]}
-        results.length.should eql(10) # make sure all threads are present
-        results.uniq.should eql([results.first]) # make sure we got the same results
-        ((stop_time.to_i - start_time.to_i) < (results.length * MocClient.sleep_time)).should be_true # make sure IO is running parallel
-        session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure sessions were created
+            threads.each do |t|
+              t.join
+            end
+            stop_time = Time.now
+          }.should_not raise_error # make sure we're thread safe
+          # Some extra checks just to make sure...
+          results = threads.collect{ |t| t[:result]}
+          results.length.should eql(10) # make sure all threads are present
+          results.uniq.should eql([results.first]) # make sure we got the same results
+          session.instance_variable_get(:@sessions).keys.length.should eql(2) # make sure sessions were created
+        end
       end
     end
   end

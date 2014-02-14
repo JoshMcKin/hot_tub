@@ -19,13 +19,17 @@ describe HotTub::Pool do
     end
 
     it "should be true" do
-      @pool.instance_variable_get(:@never_block).should be_true
+      @pool.instance_variable_get(:@non_blocking).should be_true
+    end
+
+    it "should have a HotTub::Reaper" do
+      @pool.reaper.should be_a(HotTub::Reaper)
     end
   end
 
   context 'custom settings' do
     before(:each) do
-      @pool = HotTub::Pool.new(:size => 10, :blocking_timeout => 1.0, :never_block => false) { MocClient.new }
+      @pool = HotTub::Pool.new(:size => 10, :blocking_timeout => 1.0, :non_blocking => false) { MocClient.new }
     end
 
     it "should have :size of 5" do
@@ -37,7 +41,7 @@ describe HotTub::Pool do
     end
 
     it "should be true" do
-      @pool.instance_variable_get(:@never_block).should be_false
+      @pool.instance_variable_get(:@non_blocking).should be_false
     end
   end
 
@@ -78,70 +82,57 @@ describe HotTub::Pool do
   describe '#drain!' do
     before(:each) do
       @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
+      @pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
+      @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
     end
 
-    it "should reset out" do
-      @pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
-      @pool.instance_variable_get(:@out).length.should eql(3)
-      @pool.send(:_current_size).should eql(3)
-      @pool.drain!
-      @pool.instance_variable_get(:@out).length.should eql(0)
-      @pool.send(:_current_size).should eql(0)
+    context ":close_out" do
+      it "should reset out" do
+        @pool.instance_variable_set(:@close_out, true)
+        @pool.drain!
+        @pool.instance_variable_get(:@out).length.should eql(0)
+      end
     end
 
     it "should reset pool" do
-      @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
-      @pool.instance_variable_get(:@pool).length.should eql(3)
-      @pool.send(:_current_size).should eql(3)
       @pool.drain!
       @pool.instance_variable_get(:@pool).length.should eql(0)
-      @pool.send(:_current_size).should eql(0)
+      @pool.send(:_total_count).should eql(3)
+      @pool.instance_variable_get(:@out).length.should eql(3)
     end
   end
 
-  describe '#clean' do
+  describe '#clean!' do
     before(:each) do
-      @pool = HotTub::Pool.new(:size => 5, :clean => lambda { |clnt| clnt.clean}) { MocClient.new }
+      @pool = HotTub::Pool.new(:size => 3, :clean => lambda { |clnt| clnt.clean}) { MocClient.new }
     end
 
     it "should clean pool" do
       @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
       @pool.instance_variable_get(:@pool).first.cleaned?.should be_false
-      @pool.clean
+      @pool.clean!
       @pool.instance_variable_get(:@pool).each do |clnt|
         clnt.cleaned?.should be_true
       end
     end
   end
 
-   describe '#shutdown!' do
+  describe '#shutdown!' do
     before(:each) do
       @pool = HotTub::Pool.new(:size => 5) { MocClient.new }
     end
 
     it "should kill reaper" do
-      @pool.instance_variable_get(:@reaper).status.should eql("run")
       @pool.shutdown!
       sleep(0.01)
       @pool.instance_variable_get(:@reaper).status.should be_false
     end
 
-    it "should reset out" do
-      @pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
-      @pool.instance_variable_get(:@out).length.should eql(3)
-      @pool.send(:_current_size).should eql(3)
-      @pool.shutdown!
-      @pool.instance_variable_get(:@out).length.should eql(0)
-      @pool.send(:_current_size).should eql(0)
-    end
-
     it "should reset pool" do
       @pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
-      @pool.instance_variable_get(:@pool).length.should eql(3)
-      @pool.send(:_current_size).should eql(3)
       @pool.shutdown!
       @pool.instance_variable_get(:@pool).length.should eql(0)
-      @pool.send(:_current_size).should eql(0)
+      @pool.send(:_total_count).should eql(0)
     end
   end
 
@@ -153,7 +144,7 @@ describe HotTub::Pool do
 
     describe '#client' do
       it "should raise HotTub::BlockingTimeout if an available is not found in time"do
-        @pool.instance_variable_set(:@never_block,false)
+        @pool.instance_variable_set(:@non_blocking,false)
         @pool.instance_variable_set(:@blocking_timeout, 0.1)
         @pool.stub(:raise_alarm?).and_return(true)
         lambda { puts @pool.send(:pop) }.should raise_error(HotTub::BlockingTimeout)
@@ -173,13 +164,13 @@ describe HotTub::Pool do
 
       it "should be false pool has reached pool_size" do
         @pool.instance_variable_set(:@size, 5)
-        @pool.instance_variable_set(:@pool,["connection","connection","connection","connection","connection"])
+        @pool.instance_variable_set(:@pool,[1,1,1,1,1])
         @pool.send(:_add?).should be_false
       end
     end
 
     describe '#_add' do
-      it "should add connections for supplied url"do
+      it "should add client for supplied url"do
         pre_add_length = @pool.instance_variable_get(:@pool).length
         @pool.send(:_add)
         @pool.instance_variable_get(:@pool).length.should be > pre_add_length
@@ -187,8 +178,8 @@ describe HotTub::Pool do
     end
 
     describe '#push' do
-      context "connection is registered" do
-        it "should push connection back to pool" do
+      context "client is registered" do
+        it "should push client back to pool" do
           @pool.send(:_add)
           clnt = @pool.instance_variable_get(:@pool).pop
           @pool.send(:push,clnt)
@@ -196,7 +187,7 @@ describe HotTub::Pool do
         end
       end
       context "client is nil" do
-        it "should not push connection back to pool" do
+        it "should not push client back to pool" do
           @pool.send(:push,nil)
           @pool.instance_variable_get(:@pool).include?(nil).should be_false
         end
@@ -204,54 +195,50 @@ describe HotTub::Pool do
     end
   end
 
-  context ':never_block' do
+  context ':non_blocking' do
     context 'is true' do
-      it "should add connections to pool as necessary" do
+      it "should add clients to pool as necessary" do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         threads = []
         5.times.each do
           threads << Thread.new do
-            pool.run{|connection| connection.get }
+            pool.run{|cltn| cltn.get }
           end
         end
-        sleep(0.01)
         threads.each do |t|
           t.join
         end
-        (pool.send(:_current_size) > 1).should be_true
+        (pool.send(:_total_count) > 1).should be_true
       end
     end
     context 'is false' do
-      it "should not add connections to pool beyond specified size" do
-        pool = HotTub::Pool.new({:size => 1, :never_block => false, :blocking_timeout => 100}) { MocClient.new }
+      it "should not add clients to pool beyond specified size" do
+        pool = HotTub::Pool.new({:size => 1, :non_blocking => false, :blocking_timeout => 100}) { MocClient.new }
         threads = []
-        2.times.each do
+        5.times.each do
           threads << Thread.new do
-            pool.run{|connection| connection.get }
+            pool.run{|cltn| cltn.get }
           end
         end
-        sleep(0.01)
         threads.each do |t|
           t.join
         end
-        pool.send(:_current_size).should eql(1)
+        pool.send(:_total_count).should eql(1)
       end
     end
   end
 
   describe '#reap' do
     context 'current_size is greater than :size' do
-      it "should remove a connection from the pool" do
+      it "should remove a client from the pool" do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         pool.instance_variable_set(:@last_activity,(Time.now - 601))
         pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
         pool.send(:_reap?).should be_true
-        pool.instance_variable_get(:@reaper).status.should eql('run')
-        pool.instance_variable_get(:@reaper).wakeup # run the reaper thread
+        pool.reaper.wakeup # run the reaper thread
         sleep(0.1) # let results
-        pool.send(:_current_size).should eql(1)
+        pool.send(:_total_count).should eql(1)
         pool.instance_variable_get(:@pool).length.should eql(1)
-        pool.instance_variable_get(:@reaper).status.should eql('sleep')
       end
     end
   end
@@ -267,7 +254,6 @@ describe HotTub::Pool do
             pool.run{|connection| connection.get }
           end
         end
-        sleep(0.01)
         threads.each do |t|
           t.join
         end
@@ -288,84 +274,113 @@ describe HotTub::Pool do
     end
   end
 
-  context 'Net::Http' do
-    before(:each) do
-      @pool = HotTub::Pool.new(:size => 10) {
-        uri = URI.parse(HotTub::Server.url)
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = false
-        http.start
-        http
-      }
-    end
-    it "should work" do
-      result = nil
-      @pool.run{|clnt|
-        uri = URI.parse(HotTub::Server.url)
-        result = clnt.head(uri.path).code
-      }
-      result.should eql('200')
-    end
-    context 'threads' do
+  context 'integration tests' do
+    context "blocking" do
+      before(:each) do
+        @pool = HotTub::Pool.new(:size => 5, :non_blocking => false) {
+          uri = URI.parse(HotTub::Server.url)
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = false
+          http.start
+          http
+        }
+      end
       it "should work" do
-        failed = false
-        threads = []
-        lambda {
-          15.times.each do
-            threads << Thread.new do
-              @pool.run{|connection|
-                uri = URI.parse(HotTub::Server.url)
-                Thread.current[:status] = connection.head(uri.path).code
-              }
-            end
-          end
-          sleep(0.01)
-          threads.each do |t|
-            t.join
-          end
-        }.should_not raise_error
-        # Reuse and run reaper
-        @pool.instance_variable_set(:@last_activity,(Time.now - 601))
-        lambda {
-          10.times.each do
-            threads << Thread.new do
-              uri = URI.parse(HotTub::Server.url)
-              @pool.run{|connection| Thread.current[:status] = connection.head(uri.path).code }
-            end
-          end
-          sleep(0.01)
-          threads.each do |t|
-            t.join
-          end
-        }.should_not raise_error
-        results = threads.collect{ |t| t[:status]}
-        results.length.should eql(25) # make sure all threads are present
-        results.uniq.should eql(['200']) # make sure all returned status 200
+        result = nil
+        @pool.run{|clnt|
+          uri = URI.parse(HotTub::Server.url)
+          result = clnt.head(uri.path).code
+        }
+        result.should eql('200')
+      end
+      context 'threads' do
+        it "should work" do
+          failed = false
+          threads = []
+          lambda { net_http_thread_work(@pool,10, threads) }.should_not raise_error
+          @pool.reap!
+          lambda { net_http_thread_work(@pool,20, threads) }.should_not raise_error
+          @pool.send(:_total_count).should  eql(5) # make sure the pool grew beyond size 
+          results = threads.collect{ |t| t[:status]}
+          results.length.should eql(30) # make sure all threads are present
+          results.uniq.should eql(['200']) # make sure all returned status 200
+        end
+      end
+    end
+    context "never block without max" do
+      before(:each) do
+        @pool = HotTub::Pool.new(:size => 5) {
+          uri = URI.parse(HotTub::Server.url)
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = false
+          http.start
+          http
+        }
+      end
+      it "should work" do
+        result = nil
+        @pool.run{|clnt|
+          uri = URI.parse(HotTub::Server.url)
+          result = clnt.head(uri.path).code
+        }
+        result.should eql('200')
+      end
+      context 'threads' do
+        it "should work" do
+          failed = false
+          threads = []
+          lambda { net_http_thread_work(@pool,10, threads) }.should_not raise_error
+          @pool.reap! # Force reaping to shrink pool back
+          lambda { net_http_thread_work(@pool,20, threads) }.should_not raise_error
+          @pool.send(:_total_count).should  > 10 # make sure the pool grew beyond size 
+          results = threads.collect{ |t| t[:status]}
+          results.length.should eql(30) # make sure all threads are present
+          results.uniq.should eql(['200']) # make sure all returned status 200
+        end
+      end
+    end
+    context "never block with max" do
+      before(:each) do
+        @pool = HotTub::Pool.new(:size => 5, :max_size => 10) {
+          uri = URI.parse(HotTub::Server.url)
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = false
+          http.start
+          http
+        }
+      end
+      it "should work" do
+        result = nil
+        @pool.run{|clnt|
+          uri = URI.parse(HotTub::Server.url)
+          result = clnt.head(uri.path).code
+        }
+        result.should eql('200')
+      end
+      context 'threads' do
+        it "should work" do
+          failed = false
+          threads = []
+          lambda { net_http_thread_work(@pool,10, threads) }.should_not raise_error
+          lambda { net_http_thread_work(@pool,20, threads) }.should_not raise_error
+          @pool.send(:_total_count).should eql(10) # make sure pool is at max_size
+          results = threads.collect{ |t| t[:status]}
+          results.length.should eql(30) # make sure all threads are present
+          results.uniq.should eql(['200']) # make sure all returned status 200
+        end
       end
     end
   end
 
-  # context 'thread safety' do
-  #   it "should work" do
-  #     pool = HotTub::Pool.new({:size => 5}) { MocClient.new }
-  #     failed = false
-  #     3.times do
-  #       now = Time.now
-  #       threads = []
-  #       40.times do
-  #         100.times.each do
-  #           threads << Thread.new do
-  #             pool.run{|connection| sleep(0.001)}
-  #           end
-  #         end
-  #         sleep(0.01)
-  #         threads.each do |t|
-  #           t.join
-  #         end
-  #       end
-  #       puts Time.now - now
-  #     end
-  #   end
-  # end
-
+  def net_http_thread_work(pool,thread_count=0, threads=[])
+    thread_count.times.each do
+      threads << Thread.new do
+        uri = URI.parse(HotTub::Server.url)
+        pool.run{|connection| Thread.current[:status] = connection.head(uri.path).code }
+      end
+    end
+    threads.each do |t|
+      t.join
+    end
+  end
 end

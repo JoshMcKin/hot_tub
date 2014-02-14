@@ -3,6 +3,7 @@ require 'thread_safe'
 require 'logger'
 require "hot_tub/version"
 require "hot_tub/known_clients"
+require "hot_tub/reaper"
 require "hot_tub/pool"
 require "hot_tub/sessions"
 
@@ -29,7 +30,7 @@ module HotTub
       Pool.new(opts,&client_block)
     else
       opts[:with_pool] = true unless opts[:pool] == false
-      Session.new(opts,&client_block)
+      Sessions.new(opts,&client_block)
     end
   end
 end

@@ -2,7 +2,9 @@ require 'uri'
 module HotTub
   class Sessions
     include HotTub::KnownClients
-    # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools. 
+    include HotTub::Reaper::Mixin
+
+    # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools.
     # Excon clients are initialized to a specific domain, so we sometimes need a way to
     # manage multiple pools like when a process need to connect to various AWS resources. You can use any client
     # you choose, but make sure you client is thread safe.
@@ -38,28 +40,34 @@ module HotTub
     #
     def initialize(opts={},&new_client)
       raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
-      @options          = opts                    # To pass to pool
       @with_pool        = opts[:with_pool]        # Set to true to use HotTub::Pool with supplied new_client block
       @close_client     = opts[:close]            # => lambda {|clnt| clnt.close}
       @clean_client     = opts[:clean]            # => lambda {|clnt| clnt.clean}
-      @reap_client      = opts[:reap]             # => lambda {|clnt| clnt.reap?} # should return boolean
+      @reap_client      = opts[:reap]             # => lambda {|clnt| clnt.reap?}  # should return boolean
       @new_client       = new_client              # => { |url| MyClient.new(url) } # block that accepts a url param
       @sessions         = ThreadSafe::Cache.new
+      @shutdown         = false
+      @reap_timeout     = (opts[:reap_timeout] || 600)      # the interval to reap connections in seconds
+      @reaper           = Reaper.spawn(self) unless opts[:no_reaper]
+      @pool_options     = {:no_reaper => true}.merge(opts) if @with_pool
       at_exit {drain!}
     end
 
-    # Synchronizes initialization of our sessions
+    # Safely initializes of sessions
     # expects a url string or URI
-    def sessions(url)
+    def session(url)
       key = to_key(url)
-      return @sessions[key] if @sessions[key]
+      return @sessions.get(key) if @sessions.get(key)
       if @with_pool
-        @sessions[key] = HotTub::Pool.new(@options) { @new_client.call(url) }
+        @sessions.compute_if_absent(key) {
+          HotTub::Pool.new(@pool_options) { @new_client.call(url) }
+        }
       else
-        @sessions[key] = @new_client.call(url) if @sessions[key].nil?
+        @sessions.compute_if_absent(key) {@new_client.call(url)}
       end
-      @sessions[key]
+      @sessions.get(key)
     end
+    alias :sessions :session
 
     def run(url,&block)
       session = sessions(url)
@@ -67,10 +75,10 @@ module HotTub
       block.call(sessions(url))
     end
 
-    def clean
+    def clean!
       @sessions.each_pair do |key,clnt|
         if clnt.is_a?(HotTub::Pool)
-          clnt.clean
+          clnt.clean!
         else
           clean_client(clnt)
         end
@@ -84,8 +92,8 @@ module HotTub
         else
           close_client(clnt)
         end
-        @sessions[key] = nil
       end
+      @sessions.clear
     end
 
     def shutdown!
@@ -95,7 +103,18 @@ module HotTub
         else
           close_client(clnt)
         end
-        @sessions[key] = nil
+      end
+      @sessions.clear
+    end
+
+    # Remove and close extra clients
+    def reap!
+      @sessions.each_pair do |key,clnt|
+        if clnt.is_a?(HotTub::Pool)
+          clnt.reap!
+        else
+          close_client(clnt) if reap_client?(clnt)
+        end
       end
     end
 
@@ -112,5 +131,4 @@ module HotTub
       "#{uri.scheme}://#{uri.host}:#{uri.port}"
     end
   end
-  Session = Sessions # alias for backwards compatibility
 end
