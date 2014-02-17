@@ -26,11 +26,11 @@ module HotTub
   end
 
   def self.new(opts={},&client_block)
-    if opts[:sessions] == false
-      Pool.new(opts,&client_block)
-    else
-      opts[:with_pool] = true unless opts[:pool] == false
+    if opts[:sessions] == true
+      opts[:with_pool] = true
       Sessions.new(opts,&client_block)
+    else
+      Pool.new(opts,&client_block)
     end
   end
 end

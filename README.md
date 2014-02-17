@@ -11,7 +11,7 @@ A thread safe lazy pool for HTTP clients or anything else you can think of.
 * Lazy clients/connections (created only when necessary)
 * Can be used with any client library
 * Support for cleaning dirty resources
-* Set to expand pool under load that is eventually reaped back down to set size (never_block), can be disabled
+* Set to expand pool under load which is eventually reaped back down to set size
 * Attempts to close clients/connections on shutdown
 
 ### HotTub::Sessions
@@ -44,16 +44,31 @@ Configure Logger by creating a hot_tub.rb initializer and adding the following:
 # Usage 
 
 ## HotTub
-Returns a instance of HotTub::Sessions with HotTub::Pool as the session client
+For convenience you can initialize a new HotTub::Pool by calling HotTub.new or HotTub::Pool.new directly.
+Returns an instance of HotTub::Pool.
 
-### Net::HTTP
+    require 'hot_tub'
+    require 'net/http'
+
+    pool = HotTub.new(:size => 10, :sessions => false) { 
+      uri = URI.parse("http://somewebservice.com")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = false
+      http.start
+      http
+      }
+    pool.run {|clnt| puts clnt.head('/').code }
+
+### With sessions
+Available via HotTub.new or HotTub::Sessions.new. Returns an instance of HotTub::Sessions with HotTub::Pool wrapping your client
 
     require 'hot_tub'
     require 'net/http'
 
     # We must pass any pool options in our options hash, and our client block 
     # must accept the a single argument which is normally the url
-    hot_tub = HotTub.new(:size => 12) { |url| 
+
+    hot_tub = HotTub.new(:size => 12, :sessions => true) { |url| 
       uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
@@ -75,21 +90,6 @@ with lambdas, if they are not defined they are ignored.
     hot_tub = HotTub.new({:size => 10, :close => lambda {|clnt| clnt.close}}) { MyHttpLib.new }
     hot_tub.run { |clnt| clnt.get(url,query).body }
 
-## Pool only
-Returns a HotTub::Pool instance.
-
-    require 'hot_tub'
-    require 'net/http'
-    pool = HotTub.new(:size => 10, :sessions => false) { 
-      uri = URI.parse("http://somewebservice.com")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = false
-      http.start
-      http
-      }
-    pool.run {|clnt| puts clnt.head('/').code }
-
- 
 ## Sessions only
 Returns a HotTub::Sessions instance. 
 
@@ -99,7 +99,7 @@ are handy if you need to access multiple URLs from a single instances
     require 'hot_tub'
     require 'excon'
     # Our client block must accept the url argument
-    sessions = HotTub.new(:pool => false) {|url| Excon.new(url) }
+    sessions = HotTub::Sessions.new {|url| Excon.new(url) }
 
     sessions.run("http://somewebservice.com") do |clnt|    
       puts clnt.get(:query => {:some => 'stuff'}).response_header.status
