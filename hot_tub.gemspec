@@ -9,8 +9,8 @@ Gem::Specification.new do |s|
   s.email       = ["joshmckin@gmail.com"]
   s.homepage    = "https://github.com/JoshMcKin/hot_tub"
   s.license     = "MIT"
-  s.summary     = %q{A simple thread-safe http connection session and pooling gem.}
-  s.description = %q{A simple thread-safe http connection session and pooling gem.}
+  s.summary     = %q{A flexible thread-safe pooling gem.}
+  s.description = %q{A flexible thread-safe pooling gem.}
 
   s.rubyforge_project = "hot_tub"
   
