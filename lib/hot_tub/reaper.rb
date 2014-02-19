@@ -8,8 +8,7 @@ module HotTub
     # so we rescue, log, and kill the reaper when an exception occurs
     # https://bugs.ruby-lang.org/issues/6647
     def self.spawn(obj)
-      new {
-        Thread.current[:name] = "HotTub Reaper"
+      th = new {
         loop do
           begin
             obj.reap!
@@ -22,6 +21,8 @@ module HotTub
           end
         end
       }
+      th[:name] = "HotTub::Reaper"
+      th
     end
 
     # Mixin to dry up Reaper usage

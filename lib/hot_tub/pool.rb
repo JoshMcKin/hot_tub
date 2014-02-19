@@ -64,15 +64,15 @@ module HotTub
       @shutdown         = false                 # Kills reaper when true
       @reaper           = Reaper.spawn(self) unless opts[:no_reaper]
 
-      @last_activity    = Time.now              # Repear unlocks mutex when updated
+      @last_activity    = Time.now              # Reaper unlocks mutex when updated
 
       at_exit {shutdown!}
     end
 
     # Hand off to client.run
     def run(&block)
-      clnt = client
       if block_given?
+        clnt = client
         return block.call(clnt) if clnt
       else
         raise ArgumentError, 'Run requires a block.'
