@@ -59,6 +59,8 @@ module HotTub
     # [:wait_timeout]
     #   Default is 10 seconds. An integer that represents the timeout when waiting for a client from the pool
     #   in seconds. After said time a HotTub::Pool::Timeout exception will be thrown
+    # [:reap_timeout]
+    #   Default is 600 seconds. An integer that represents the timeout for reaping the pool in seconds.
     # [:close_out]
     #   Default is nil. A boolean like value that if it can be interpreted as true force close_client to be called
     #   on checkout clients when #drain! is called
