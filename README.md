@@ -1,6 +1,6 @@
 # HotTub [![Build Status](https://travis-ci.org/JoshMcKin/hot_tub.png?branch=master)](https://travis-ci.org/JoshMcKin/hot_tub) [![Coverage Status](https://coveralls.io/repos/JoshMcKin/hot_tub/badge.png?branch=master)](https://coveralls.io/r/JoshMcKin/hot_tub)
 
-A flexible thread-safe pooling gem. When you need more than a standard static pool.
+A dynamic thread-safe pooling gem, when you need more than a standard static pool.
 
 ## Features
 
