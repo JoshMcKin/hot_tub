@@ -60,7 +60,7 @@ Returns an instance of HotTub::Pool.
     require 'hot_tub'
     require 'net/http'
 
-    pool = HotTub.new(:size => 10, :sessions => false) { 
+    pool = HotTub.new(:size => 10) { 
       uri = URI.parse("http://somewebservice.com")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
