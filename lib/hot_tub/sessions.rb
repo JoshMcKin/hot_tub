@@ -7,7 +7,7 @@ module HotTub
     # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools.
     # 
     #
-    # Example with Pool:
+    # == Example with Pool:
     # You can initialize a HotTub::Pool with each client by passing :with_pool as true and any pool options
     #   sessions = HotTub::Sessions.new(:with_pool => true, :size => 12) {
     #       uri = URI.parse("http://somewebservice.com")
@@ -25,7 +25,7 @@ module HotTub
     #     p conn.head('/').code
     #   end
     #
-    # Excon clients are initialized to a specific domain. Its sometimes useful
+    # == Excon clients are initialized to a specific domain. Its sometimes useful
     # to have the options of initializing Excon connections after startup, in 
     # a thread safe manner for multiple urls with a single object.
     # Example:
