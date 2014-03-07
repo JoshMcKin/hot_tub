@@ -7,7 +7,9 @@ class MocClient
 
   # Perform an IO
   def get
-    sleep(self.class.sleep_time)
+    prng = Random.new()
+    t_s = "0.0#{prng.rand(1..9)}".to_f
+    sleep(t_s)
   end
 
   def close
@@ -32,11 +34,5 @@ class MocClient
 
   def reaped?
     @reaped
-  end
-
-  class << self
-    def sleep_time
-      0.1
-    end
   end
 end

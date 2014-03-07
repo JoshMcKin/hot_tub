@@ -13,6 +13,8 @@ Gem::Specification.new do |s|
   s.description = %q{A dynamic thread-safe pooling gem, when you need more than a standard static pool.}
 
   s.rubyforge_project = "hot_tub"
+
+  s.add_runtime_dependency "thread_safe"
   
   s.add_development_dependency "rspec"
   s.add_development_dependency "sinatra"

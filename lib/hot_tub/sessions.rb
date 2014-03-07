@@ -5,20 +5,7 @@ module HotTub
     include HotTub::Reaper::Mixin
 
     # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools.
-    # Excon clients are initialized to a specific domain, so we sometimes need a way to
-    # manage multiple pools like when a process need to connect to various AWS resources. You can use any client
-    # you choose, but make sure you client is thread safe.
-    # Example:
-    #
-    #   sessions = HotTub::Sessions.new { |url| Excon.new(url) }
-    #
-    #   sessions.run("http://wwww.yahoo.com") do |conn|
-    #     p conn.head.status
-    #   end
-    #
-    #   sessions.run("https://wwww.google.com") do |conn|
-    #     p conn.head.status
-    #   end
+    # 
     #
     # Example with Pool:
     # You can initialize a HotTub::Pool with each client by passing :with_pool as true and any pool options
@@ -38,6 +25,20 @@ module HotTub
     #     p conn.head('/').code
     #   end
     #
+    # Excon clients are initialized to a specific domain. Its sometimes useful
+    # to have the options of initializing Excon connections after startup, in 
+    # a thread safe manner for multiple urls with a single object.
+    # Example:
+    #
+    #   sessions = HotTub::Sessions.new { |url| Excon.new(url) }
+    #
+    #   sessions.run("http://wwww.yahoo.com") do |conn|
+    #     p conn.head.status
+    #   end
+    #
+    #   sessions.run("https://wwww.google.com") do |conn|
+    #     p conn.head.status
+    #   end
     def initialize(opts={},&new_client)
       raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
       @with_pool        = opts[:with_pool]        # Set to true to use HotTub::Pool with supplied new_client block

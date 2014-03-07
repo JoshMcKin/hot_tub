@@ -152,6 +152,8 @@ module HotTub
     end
 
     # Remove and close extra clients
+    # Releases mutex each iteration because
+    # reaping is low priority action
     def reap!
       start = Time.now
       loop do
