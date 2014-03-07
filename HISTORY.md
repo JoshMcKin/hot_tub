@@ -1,7 +1,12 @@
 HotTub Changelog
 =====================
 
-HEAD
+Head
+=======
+
+- Nothing yet
+
+0.3.0
 =======
 
 - Drop EM support, will move to separate gem
