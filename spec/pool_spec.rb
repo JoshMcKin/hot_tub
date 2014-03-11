@@ -331,10 +331,10 @@ describe HotTub::Pool do
           threads = []
           lambda { net_http_thread_work(@pool,10, threads) }.should_not raise_error
           @pool.reap! # Force reaping to shrink pool back
-          lambda { net_http_thread_work(@pool,20, threads) }.should_not raise_error
+          lambda { net_http_thread_work(@pool,40, threads) }.should_not raise_error
           @pool.send(:_total_current_size).should  > 5 # make sure the pool grew beyond size 
           results = threads.collect{ |t| t[:status]}
-          results.length.should eql(30) # make sure all threads are present
+          results.length.should eql(50) # make sure all threads are present
           results.uniq.should eql(['200']) # make sure all returned status 200
         end
       end
@@ -362,10 +362,10 @@ describe HotTub::Pool do
           failed = false
           threads = []
           lambda { net_http_thread_work(@pool,10, threads) }.should_not raise_error
-          lambda { net_http_thread_work(@pool,20, threads) }.should_not raise_error
+          lambda { net_http_thread_work(@pool,40, threads) }.should_not raise_error
           @pool.send(:_total_current_size).should  > 5 # make sure pool is at max_size
           results = threads.collect{ |t| t[:status]}
-          results.length.should eql(30) # make sure all threads are present
+          results.length.should eql(50) # make sure all threads are present
           results.uniq.should eql(['200']) # make sure all returned status 200
         end
       end
