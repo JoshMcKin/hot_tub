@@ -11,15 +11,15 @@ describe HotTub::Reaper do
   end
 
   it "should reap!" do
-  	@pool.reaped.should be_false
+  	@pool.reaped.should eql(false)
   	@pool.lets_reap = true
   	@reaper.wakeup
   	sleep(0.01)
-  	@pool.reaped.should be_true
+  	@pool.reaped.should eql(true)
   end
 
   it "should sleep after reap!" do
-  	@pool.reaped.should be_false
+  	@pool.reaped.should eql(false)
   	@pool.lets_reap = true
   	@reaper.wakeup
   	sleep(0.01)
