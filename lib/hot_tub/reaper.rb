@@ -1,5 +1,5 @@
 module HotTub
-  class Reaper < Thread
+  class Reaper
 
     # Creates a new Reaper thread for work.
     # Expects an object that responses to: :reap!
@@ -8,7 +8,7 @@ module HotTub
     # so we rescue, log, and kill the reaper when an exception occurs
     # https://bugs.ruby-lang.org/issues/6647
     def self.spawn(obj)
-      th = new {
+      th = Thread.new {
         loop do
           begin
             obj.reap!

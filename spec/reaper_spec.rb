@@ -6,7 +6,6 @@ describe HotTub::Reaper do
     @reaper = @pool.reaper
   end
   it "should be a HotTub::Reaper Thread" do
-  	@reaper.should be_a(HotTub::Reaper)
     @reaper.should be_a(Thread)
   end
 
