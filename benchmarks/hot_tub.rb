@@ -5,38 +5,11 @@ require 'connection_pool'
 
 class MocClient
   def initialize(url=nil,options={})
-    @reaped = false
-    @close = false
-    @clean = false
   end
 
   # Perform an IO
   def get
     sleep(0.01)
-  end
-
-  def close
-    @close = true
-  end
-
-  def closed?
-    @close == true
-  end
-
-  def clean
-    @clean = true
-  end
-
-  def cleaned?
-    @clean == true
-  end
-
-  def reap
-    @reaped = true
-  end
-
-  def reaped?
-    @reaped
   end
 end
 
