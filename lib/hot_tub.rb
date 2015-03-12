@@ -8,7 +8,8 @@ require "hot_tub/pool"
 require "hot_tub/sessions"
 
 module HotTub
-  @@logger = Logger.new(STDOUT)
+  @@logger = nil
+
   def self.logger
     @@logger
   end
@@ -22,7 +23,7 @@ module HotTub
   end
 
   def self.rbx?
-    defined?(RUBY_ENGINE) and RUBY_ENGINE == 'rbx'
+    (defined?(RUBY_ENGINE) and RUBY_ENGINE == 'rbx')
   end
 
   def self.new(opts={},&client_block)

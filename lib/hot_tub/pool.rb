@@ -84,7 +84,7 @@ module HotTub
       raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
 
       @size             = (opts[:size] || 5)                # in seconds
-      @wait_timeout     = (opts[:wait_timeout] || 10)   # in seconds
+      @wait_timeout     = (opts[:wait_timeout] || 10)       # in seconds
       @reap_timeout     = (opts[:reap_timeout] || 600)      # the interval to reap connections in seconds
       @close_out        = opts[:close_out]                  # if true on drain! call close_client block on checked out clients
       @max_size         = (opts[:max_size] || 0)            # maximum size of pool when non-blocking, 0 means no limit
@@ -109,10 +109,10 @@ module HotTub
     end
 
     # Hand off to client.run
-    def run(&block)
+    def run
       if block_given?
         clnt = client
-        return block.call(clnt) if clnt
+        return yield clnt if clnt
       else
         raise ArgumentError, 'Run requires a block.'
       end
@@ -192,7 +192,7 @@ module HotTub
 
     def raise_alarm
       message = "Could not fetch a free client in time. Consider increasing your pool size."
-      HotTub.logger.error message
+      HotTub.logger.error message if HotTub.logger
       raise Timeout, message
     end
 
@@ -209,6 +209,7 @@ module HotTub
         end
         close_client(clnt) if @shutdown
       end
+      reap! unless @reaper
       nil
     end
 
@@ -279,7 +280,7 @@ module HotTub
     def _add
       return false unless _add?
       nc = @new_client.call
-      HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool"
+      HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool" if HotTub.logger
       @pool << nc
       true
     end

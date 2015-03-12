@@ -21,7 +21,7 @@ module HotTub
         action = (@clean_client || known_client_action(clnt,:clean))
         preform_client_action(clnt,action) if action
       rescue => e
-        HotTub.logger.error "There was an error cleaning one of your #{self.class.name} clients: #{e}"
+        HotTub.logger.error "There was an error cleaning one of your #{self.class.name} clients: #{e}" if HotTub.logger
       end
     end
 
@@ -32,7 +32,7 @@ module HotTub
         action = (@close_client || known_client_action(clnt,:close))
         preform_client_action(clnt,action) if action
       rescue => e
-        HotTub.logger.error "There was an error closing one of your #{self.class.name} clients: #{e}"
+        HotTub.logger.error "There was an error closing one of your #{self.class.name} clients: #{e}" if HotTub.logger
       end
     end
 
@@ -42,7 +42,7 @@ module HotTub
         action = (@reap_client || known_client_action(clnt,:reap))
         return preform_client_action(clnt,action) if action
       rescue => e
-        HotTub.logger.error "There was an error reaping one of your #{self.class.name} clients: #{e}"
+        HotTub.logger.error "There was an error reaping one of your #{self.class.name} clients: #{e}" if HotTub.logger
       end
       return false
     end

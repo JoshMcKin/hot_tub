@@ -15,8 +15,8 @@ module HotTub
             break if obj.shutdown
             sleep(obj.reap_timeout || 600)
           rescue Exception => e
-            HotTub.logger.error "HotTub::Reaper for #{obj.class.name} terminated with exception: #{e.message}"
-            HotTub.logger.error e.backtrace.map {|line| " #{line}"}
+            HotTub.logger.error "HotTub::Reaper for #{obj.class.name} terminated with exception: #{e.message}" if HotTub.logger
+            HotTub.logger.error e.backtrace.map {|line| " #{line}"} if HotTub.logger
             break
           end
         end
