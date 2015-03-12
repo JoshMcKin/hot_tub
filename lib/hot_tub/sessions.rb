@@ -5,7 +5,7 @@ module HotTub
     include HotTub::Reaper::Mixin
 
     # HotTub::Session is a ThreadSafe::Cache where URLs are mapped to clients or pools.
-    # 
+    #
     #
     # == Example with Pool:
     # You can initialize a HotTub::Pool with each client by passing :with_pool as true and any pool options
@@ -26,7 +26,7 @@ module HotTub
     #   end
     #
     # == Excon clients are initialized to a specific domain. Its sometimes useful
-    # to have the options of initializing Excon connections after startup, in 
+    # to have the options of initializing Excon connections after startup, in
     # a thread safe manner for multiple urls with a single object.
     # Example:
     #
@@ -120,14 +120,11 @@ module HotTub
     end
 
     def shutdown!
-      @sessions.each_pair do |key,clnt|
-        if clnt.is_a?(HotTub::Pool)
-          clnt.shutdown!
-        else
-          close_client(clnt)
-        end
+      begin
+        kill_reaper
+      ensure
+        drain!
       end
-      @sessions.clear
     end
 
     # Remove and close extra clients

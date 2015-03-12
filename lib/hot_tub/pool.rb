@@ -148,7 +148,11 @@ module HotTub
     # Kills the reaper and drains the pool.
     def shutdown!
       @shutdown = true
-      drain!
+      begin
+        kill_reaper
+      ensure
+        drain!
+      end
     end
 
     # Remove and close extra clients

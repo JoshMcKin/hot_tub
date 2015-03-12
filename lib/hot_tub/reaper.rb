@@ -32,6 +32,11 @@ module HotTub
       def reap!
         raise NoMethodError.new(':reap! must be redefined in your class')
       end
+
+      def kill_reaper
+        @shutdown = true
+        @reaper.wakeup if @reaper && @reaper.alive? # wake up to shutdown
+      end
     end
   end
 end
