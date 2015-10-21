@@ -216,8 +216,8 @@ describe HotTub::Pool do
   end
 
   context 'thread safety' do
-    it "should work" do
-      pool = HotTub::Pool.new({:size => 10}) { MocClient.new }
+    it "should grow" do
+      pool = HotTub::Pool.new({:size => 5}) { MocClient.new }
       failed = false
       expect {
         threads = []
@@ -230,7 +230,7 @@ describe HotTub::Pool do
           t.join
         end
       }.to_not raise_error
-      expect(pool.instance_variable_get(:@pool).length).to be >= 10
+      expect(pool.current_size).to be >= 5
     end
   end
 
@@ -291,13 +291,13 @@ describe HotTub::Pool do
         it "should work" do
           failed = false
           threads = []
-          expect { 50.times do
-                 net_http_thread_work(pool, 10, threads)
+          expect { 5.times do
+                 net_http_thread_work(pool, 20, threads)
                end
                }.to_not raise_error
           expect(pool.current_size).to eql(10)
           results = threads.collect{ |t| t[:status]}
-          expect(results.length).to eql(500) # make sure all threads are present
+          expect(results.length).to eql(100) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
         end
       end
@@ -327,13 +327,13 @@ describe HotTub::Pool do
         it "should work" do
           failed = false
           threads = []
-          expect { 50.times do
-                 net_http_thread_work(pool, 10, threads)
+          expect { 5.times do
+                 net_http_thread_work(pool, 20, threads)
                end
                }.to_not raise_error
           expect(pool.current_size).to be > 5 # make sure the pool grew beyond size
           results = threads.collect{ |t| t[:status]}
-          expect(results.length).to eql(500) # make sure all threads are present
+          expect(results.length).to eql(100) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
         end
       end
