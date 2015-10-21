@@ -120,25 +120,6 @@ You can use any library you want with `HotTub::Pool`.
     hot_tub = HotTub.new({:size => 10, :close => lambda {|clnt| clnt.close}, :clean => :clean, :reap => :reap?}) { MyHttpLib.new }
     hot_tub.run { |clnt| clnt.get(url,query).body }
 
-## Sessions only
-Returns a `HotTub::Sessions` instance. 
-
-[Excon](https://github.com/geemus/excon) is thread safe but you set a single url at the client level so sessions 
-are handy if you need to access multiple URLs from a single instances
-    
-    require 'hot_tub'
-    require 'excon'
-    # Our client block must accept the url argument
-    sessions = HotTub::Sessions.new {|url| Excon.new(url) }
-
-    sessions.run("http://somewebservice.com") do |clnt|    
-      puts clnt.get(:query => {:some => 'stuff'}).response_header.status
-    end
-
-    sessions.run("https://someotherwebservice.com") do |clnt|    
-      puts clnt.get(:query => {:other => 'stuff'}).response_header.status
-    end
-
 ## Dependencies
 
 * [ThreadSafe](https://github.com/headius/thread_safe)
