@@ -78,8 +78,6 @@ Returns an instance of HotTub::Pool.
 
 **reap_timeout**: Default is 600 seconds. An integer that represents the timeout for reaping the pool in seconds.
 
-**close_out**: Default is false. A boolean value that if true force close_client to be called on checkout clients when #drain! is called
-
 **close**: Default is nil. Can be a symbol representing an method to call on a client to close the client or a lambda that accepts the client as a parameter that will close a client. The close option is performed on clients on reaping and shutdown after the client has been removed from the pool.  When nil, as is the default, no action is performed.
 
 **clean**: Default is nil. Can be a symbol representing an method to call on a client to clean the client or a lambda that accepts the client as a parameter that will clean a client. When nil, as is the default, no action is performed.
