@@ -61,9 +61,6 @@ module HotTub
     #   in seconds. After said time a HotTub::Pool::Timeout exception will be thrown
     # [:reap_timeout]
     #   Default is 600 seconds. An integer that represents the timeout for reaping the pool in seconds.
-    # [:close_out]
-    #   Default is nil. A boolean like value that if it can be interpreted as true force close_client to be called
-    #   on checkout clients when #drain! is called
     # [:close]
     #   Default is nil. Can be a symbol representing an method to call on a client to close the client or a lambda
     #   that accepts the client as a parameter that will close a client. The close option is performed on clients
@@ -86,7 +83,6 @@ module HotTub
       @size             = (opts[:size] || 5)                # in seconds
       @wait_timeout     = (opts[:wait_timeout] || 10)       # in seconds
       @reap_timeout     = (opts[:reap_timeout] || 600)      # the interval to reap connections in seconds
-      @close_out        = opts[:close_out]                  # if true on drain! call close_client block on checked out clients
       @max_size         = (opts[:max_size] || 0)            # maximum size of pool when non-blocking, 0 means no limit
 
       @close_client     = opts[:close]                    # => lambda {|clnt| clnt.close} or :close
@@ -136,14 +132,17 @@ module HotTub
     # Its possible clients may be returned to the pool after cleaning
     def drain!
       @mutex.synchronize do
-        while clnt = (@pool.pop || (@close_out && @out.pop))
-          close_client(clnt)
+        begin
+          while clnt = (@pool.pop || @out.pop)
+            close_client(clnt)
+          end
+        ensure
+          @cond.broadcast
         end
-        @cond.broadcast
       end
     end
     alias :close! :drain!
-    alias :close_all! :drain!
+    alias :reset! :drain!
 
     # Kills the reaper and drains the pool.
     def shutdown!
@@ -157,10 +156,10 @@ module HotTub
 
     # Remove and close extra clients
     # Releases mutex each iteration because
-    # reaping is low priority action
+    # reaping is a low priority action
     def reap!
-      start = Time.now
       loop do
+        break if @shutdown
         reaped = nil
         @mutex.synchronize do
           reaped = @pool.shift if _reap?
@@ -175,6 +174,12 @@ module HotTub
 
     def never_block?
       (@max_size == 0)
+    end
+
+    def current_size
+      @mutex.synchronize do
+        _total_current_size
+      end
     end
 
     private
@@ -194,8 +199,10 @@ module HotTub
       (time <= Time.now)
     end
 
+    ALARM_MESSAGE = "Could not fetch a free client in time. Consider increasing your pool size."
+
     def raise_alarm
-      message = "Could not fetch a free client in time. Consider increasing your pool size."
+      message = ALARM_MESSAGE
       HotTub.logger.error message if HotTub.logger
       raise Timeout, message
     end
@@ -205,15 +212,18 @@ module HotTub
     def push(clnt)
       if clnt
         @mutex.synchronize do
-          @out.delete(clnt)
-          unless @shutdown
-            @pool << clnt
+          begin
+            @out.delete(clnt)
+            unless @shutdown
+              @pool << clnt
+            end
+          ensure
             @cond.signal
           end
         end
         close_client(clnt) if @shutdown
+        reap! unless @reaper
       end
-      reap! unless @reaper
       nil
     end
 
@@ -225,8 +235,8 @@ module HotTub
         break if @shutdown
         raise_alarm if raise_alarm?(alarm)
         @mutex.synchronize do
-          if (_space? || _add)
-            @out << clnt = @pool.pop
+          if clnt = (@pool.pop || _fetch_new)
+            @out << clnt
           else
             @cond.wait(@mutex,@wait_timeout)
           end
@@ -274,19 +284,18 @@ module HotTub
     # a lazy model. If the pool is empty we can only add clients if
     # never_block? is true or there is room to grow. _add? is volatile;
     # and may be in accurate if called outside @mutex.synchronize {}
-    def _add?
+    def _fetch_new?
       (_empty? && (never_block? || _less_than_size?|| _less_than_max?))
     end
 
     # Adds a new client to the pool if its allowed
     # _add is volatile; and may cause threading issues
     # if called outside @mutex.synchronize {}
-    def _add
-      return false unless _add?
+    def _fetch_new
+      return nil unless _fetch_new?
       nc = @new_client.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool" if HotTub.logger
-      @pool << nc
-      true
+      nc
     end
 
     # Returns true if we have clients in the pool, the pool

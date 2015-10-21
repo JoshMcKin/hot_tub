@@ -23,6 +23,7 @@ module HotTub
       rescue => e
         HotTub.logger.error "There was an error cleaning one of your #{self.class.name} clients: #{e}" if HotTub.logger
       end
+      clnt
     end
 
     # Attempts to close the provided client, checking the options first for a close block
@@ -34,6 +35,7 @@ module HotTub
       rescue => e
         HotTub.logger.error "There was an error closing one of your #{self.class.name} clients: #{e}" if HotTub.logger
       end
+      nil
     end
 
     # Attempts to determine if a client should be reaped, block should return a boolean
@@ -44,7 +46,7 @@ module HotTub
       rescue => e
         HotTub.logger.error "There was an error reaping one of your #{self.class.name} clients: #{e}" if HotTub.logger
       end
-      return false
+      false
     end
 
     private

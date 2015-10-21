@@ -18,6 +18,7 @@ end
 class MocReaperPool < MocPool
   def initialize
   	super
+    @reap_timeout = 1
     @reaper = HotTub::Reaper.spawn(self)
   end
 end

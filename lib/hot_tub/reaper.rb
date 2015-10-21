@@ -22,6 +22,7 @@ module HotTub
         end
       }
       th[:name] = "HotTub::Reaper"
+      th.abort_on_exception = true
       th
     end
 
@@ -30,12 +31,14 @@ module HotTub
       attr_reader :reap_timeout, :reaper, :shutdown
 
       def reap!
-        raise NoMethodError.new(':reap! must be redefined in your class')
+        raise NoMethodError.new('#reap! must be redefined in your class')
       end
 
       def kill_reaper
-        @shutdown = true
-        @reaper.wakeup if @reaper && @reaper.alive? # wake up to shutdown
+        if @reaper
+          @reaper.kill
+          @reaper.join
+        end
       end
     end
   end

@@ -1,27 +1,27 @@
 require 'spec_helper'
 
 describe HotTub::Reaper do
-  before(:each) do
-    @pool = MocReaperPool.new
-    @reaper = @pool.reaper
-  end
+  
+  let(:pool) { MocReaperPool.new }
+  let(:reaper) { pool.reaper }
+
   it "should be a HotTub::Reaper Thread" do
-    @reaper.should be_a(Thread)
+    expect(reaper).to be_a(Thread)
   end
 
   it "should reap!" do
-  	@pool.reaped.should eql(false)
-  	@pool.lets_reap = true
-  	@reaper.wakeup
-  	sleep(0.01)
-  	@pool.reaped.should eql(true)
+    expect(pool.reaped).to eql(false)
+    pool.lets_reap = true
+    reaper.wakeup
+    sleep(0.01)
+    expect(pool.reaped).to eql(true)
   end
 
   it "should sleep after reap!" do
-  	@pool.reaped.should eql(false)
-  	@pool.lets_reap = true
-  	@reaper.wakeup
-  	sleep(0.01)
-  	@reaper.status.should eql('sleep')
+    expect(pool.reaped).to eql(false)
+    pool.lets_reap = true
+    reaper.wakeup
+    sleep(0.01)
+    expect(reaper.status).to eql('sleep')
   end
 end
