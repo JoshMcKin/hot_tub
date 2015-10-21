@@ -291,11 +291,13 @@ describe HotTub::Pool do
         it "should work" do
           failed = false
           threads = []
-          expect { net_http_thread_work(pool,10, threads) }.to_not raise_error
-          expect { net_http_thread_work(pool,40, threads) }.to_not raise_error
+          expect { 50.times do
+                 net_http_thread_work(pool, 10, threads)
+               end
+               }.to_not raise_error
           expect(pool.current_size).to eql(10)
           results = threads.collect{ |t| t[:status]}
-          expect(results.length).to eql(50) # make sure all threads are present
+          expect(results.length).to eql(500) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
         end
       end
@@ -320,17 +322,18 @@ describe HotTub::Pool do
         }
         expect(result).to eql('200')
       end
-      
+
       context 'threads' do
         it "should work" do
           failed = false
           threads = []
-          expect { net_http_thread_work(pool,10, threads) }.to_not raise_error
-          pool.reap! # Force reaping to shrink pool back
-          expect { net_http_thread_work(pool,40, threads) }.to_not raise_error
+          expect { 50.times do
+                 net_http_thread_work(pool, 10, threads)
+               end
+               }.to_not raise_error
           expect(pool.current_size).to be > 5 # make sure the pool grew beyond size
           results = threads.collect{ |t| t[:status]}
-          expect(results.length).to eql(50) # make sure all threads are present
+          expect(results.length).to eql(500) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
         end
       end
