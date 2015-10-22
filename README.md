@@ -15,7 +15,7 @@ A thread safe, lazy pool.
 * Support for closing resources on shutdown
 
 ### HotTub::Sessions
-A [ThreadSafe::Cache](https://github.com/headius/thread_safe) where URLs are mapped to a pool or client instance.
+A [ThreadSafe::Cache](https://github.com/headius/thread_safe) where URLs are mapped to a HotTub::Pool
 
 ### Requirements
 HotTub is tested on MRI, JRUBY and Rubinius
@@ -68,6 +68,16 @@ Returns an instance of HotTub::Pool.
       http
       }
     pool.run {|clnt| puts clnt.head('/').code }
+
+### Excon
+
+    require 'hot_tub'
+    require 'excon'
+
+    pool = HotTub.new(:size => 10) { 
+      Excon.new("http://somewebservice.com", :thread_safe_sockets => false)
+      }
+    pool.run {|clnt| puts clnt.head('/').status }
 
 ### HotTub Options    
 **size**: Default is 5. An integer that sets the size of the pool. Could be describe as minimum size the pool should grow to.

@@ -38,6 +38,7 @@ module HotTub
         if @reaper
           @reaper.kill
           @reaper.join
+          @reaper = nil
         end
       end
     end

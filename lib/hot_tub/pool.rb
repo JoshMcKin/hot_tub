@@ -142,16 +142,33 @@ module HotTub
       end
     end
     alias :close! :drain!
-    alias :reset! :drain!
+
+    # Reset the pool and re-spawn reaper.
+    # or if shutdown allow threads to quickly finish their work
+    # Clients from the previous pool will not return to pool.
+    def reset!
+      @mutex.synchronize do
+        begin
+          while clnt = (@pool.pop || @out.pop)
+            close_client(clnt)
+          end
+          if @reaper
+            kill_reaper
+            @reaper = Reaper.spawn(self)
+          end
+        ensure
+          @cond.broadcast
+        end
+      end
+      nil
+    end
 
     # Kills the reaper and drains the pool.
     def shutdown!
       @shutdown = true
-      begin
-        kill_reaper
-      ensure
-        drain!
-      end
+      kill_reaper if @reaper
+    ensure
+      drain!
     end
 
     # Remove and close extra clients
@@ -213,9 +230,10 @@ module HotTub
       if clnt
         @mutex.synchronize do
           begin
-            @out.delete(clnt)
-            unless @shutdown
-              @pool << clnt
+            if @out.delete(clnt)
+              unless @shutdown
+                @pool << clnt
+              end
             end
           ensure
             @cond.signal

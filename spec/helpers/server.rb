@@ -15,25 +15,17 @@ module HotTub
     set :server, 'puma'
     set :port, 9595
 
-    get '/data/:amount' do |amount|
+    get '/data' do
       sleep(0.01)
-      (('x' * amount.to_i ) << Random.new.rand(0..999999).to_s)
+      "foo"
     end
 
     def self.teardown
       @server.stop(true) if @server
     end
 
-    def self.size
-      10_000
-    end
-
-    def self.path
-      '/data/' << size.to_s
-    end
-
     def self.url
-      'http://127.0.0.1:9595' << path
+      'http://127.0.0.1:9595/data'
     end
   end
 
@@ -51,9 +43,9 @@ module HotTub
     set :server, 'puma'
     set :port, 9393
 
-
-    get '/quick' do
-      (Random.new.rand(0..999999).to_s)
+    get '/foo' do
+      sleep(0.01)
+      "foo"
     end
 
     def self.teardown
@@ -61,7 +53,7 @@ module HotTub
     end
 
     def self.url
-      'http://127.0.0.1:9393/quick' 
+      'http://127.0.0.1:9393/foo' 
     end
   end
 end
