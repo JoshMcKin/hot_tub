@@ -14,8 +14,9 @@ describe HotTub, 'with sessions' do
     }
   end
 
-  it "should work" do
-    threads = []
+  let(:threads) { [] }
+
+  before(:each) do
     10.times.each do
       threads << Thread.new do
         sessions.run(url)  { |clnt| Thread.current[:result] = clnt.get(URI.parse(url).path).code }
@@ -25,9 +26,15 @@ describe HotTub, 'with sessions' do
     threads.each do |t|
       t.join
     end
+  end
+
+  it "should work" do
     results = threads.collect{ |t| t[:result]}
-    expect(results.length).to eql(10) 
-    expect(results.uniq).to eql([results.first]) 
-    expect(sessions.instance_variable_get(:@sessions).keys.length).to eql(2) 
+    expect(results.length).to eql(10)
+    expect(results.uniq).to eql([results.first])
+  end
+  
+  it "should work" do
+    expect(sessions.instance_variable_get(:@sessions).keys.length).to eql(2)
   end
 end
