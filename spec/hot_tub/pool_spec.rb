@@ -206,8 +206,9 @@ describe HotTub::Pool do
         pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
         pool.instance_variable_set(:@last_activity,(Time.now - 601))
         pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
-        expect(pool.send(:_reap?)).to eql(true)
-        pool.reaper.wakeup # run the reaper thread
+        pool.reap!
+        # expect(pool.send(:_reap?)).to eql(true)
+        # pool.reaper.wakeup # run the reaper thread
         sleep(0.01) # let results
         expect(pool.send(:_total_current_size)).to eql(1)
         expect(pool.instance_variable_get(:@pool).length).to eql(1)
