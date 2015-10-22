@@ -12,15 +12,23 @@ describe HotTub do
       }
     end
 
-    it "should work" do
-      threads = []
+    let(:threads) { [] }
+
+    before(:each) do
       5.times do
-        net_http_thread_work(pool, 20, threads)
+        net_http_thread_work(pool, 30, threads)
       end
-      expect(pool.current_size).to eql(4) # make sure the pool grew beyond size
+    end
+
+    it { expect(pool.current_size).to eql(4) } # make sure the pool grew beyond size
+
+    it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(100) # make sure all threads are present
+      expect(results.length).to eql(150) # make sure all threads are present
       expect(results.uniq).to eql(['200']) # make sure all returned status 200
+    end
+
+    it "should shutdown" do
       pool.shutdown!
       expect(pool.current_size).to eql(0)
     end
@@ -37,15 +45,19 @@ describe HotTub do
       }
     end
 
-    it "should work" do
-      threads = []
+    let(:threads) { [] }
+
+    before(:each) do
       5.times do
-        net_http_thread_work(pool, 20, threads)
+        net_http_thread_work(pool, 30, threads)
       end
-      expect(pool.current_size).to be >= 4
-      expect(pool.current_size).to be <= 8
+    end
+
+    it { expect(pool.current_size).to be >= 4 }
+    it { expect(pool.current_size).to be <= 8 }
+    it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(100) # make sure all threads are present
+      expect(results.length).to eql(150) # make sure all threads are present
       expect(results.uniq).to eql(['200']) # make sure all returned status 200
     end
   end
@@ -61,14 +73,19 @@ describe HotTub do
       }
     end
 
-    it "should work" do
-      threads = []
+    let(:threads) { [] }
+
+    before(:each) do
       5.times do
-        net_http_thread_work(pool, 20, threads)
+        net_http_thread_work(pool, 30, threads)
       end
-      expect(pool.current_size).to be > 4 # make sure the pool grew beyond size
+    end
+
+    it { expect(pool.current_size).to be > 4 } # make sure the pool grew beyond size
+
+    it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(100) # make sure all threads are present
+      expect(results.length).to eql(150) # make sure all threads are present
       expect(results.uniq).to eql(['200']) # make sure all returned status 200
     end
   end
