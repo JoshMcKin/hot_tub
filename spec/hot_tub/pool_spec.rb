@@ -69,7 +69,7 @@ describe HotTub::Pool do
   end
 
   describe '#drain!' do
-    let(:pool) { HotTub::Pool.new(:size => 5) { MocClient.new } }
+    let(:pool) { HotTub::Pool.new(:size => 4) { MocClient.new } }
     before(:each) do
       pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
       pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
@@ -97,7 +97,7 @@ describe HotTub::Pool do
   end
 
   describe '#shutdown!' do
-    let(:pool) { HotTub::Pool.new(:size => 5) { MocClient.new } }
+    let(:pool) { HotTub::Pool.new(:size => 4) { MocClient.new } }
 
     it "should kill reaper" do
       pool.shutdown!
@@ -217,7 +217,7 @@ describe HotTub::Pool do
 
   context 'thread safety' do
     it "should grow" do
-      pool = HotTub::Pool.new({:size => 5}) { MocClient.new }
+      pool = HotTub::Pool.new({:size => 4}) { MocClient.new }
       failed = false
       expect {
         threads = []
@@ -230,14 +230,14 @@ describe HotTub::Pool do
           t.join
         end
       }.to_not raise_error
-      expect(pool.current_size).to be >= 5
+      expect(pool.current_size).to be >= 4
     end
   end
 
   context 'feature tests' do
     context "blocking (size equals max_size)" do
       let(:pool) do
-        HotTub::Pool.new(:size => 5, :max_size => 5) {
+        HotTub::Pool.new(:size => 4, :max_size => 4) {
           uri = URI.parse(HotTub::Server.url)
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = false
@@ -269,7 +269,7 @@ describe HotTub::Pool do
                  net_http_thread_work(pool, 20, threads)
                end
                }.to_not raise_error
-          expect(pool.current_size).to eql(5) # make sure the pool grew beyond size
+          expect(pool.current_size).to eql(4) # make sure the pool grew beyond size
           results = threads.collect{ |t| t[:status]}
           expect(results.length).to eql(200) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
@@ -279,7 +279,7 @@ describe HotTub::Pool do
 
     context "with larger max" do
       let(:pool) do
-        HotTub::Pool.new(:size => 5, :max_size => 10) {
+        HotTub::Pool.new(:size => 4, :max_size => 8) {
           uri = URI.parse(HotTub::Server.url)
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = false
@@ -303,8 +303,8 @@ describe HotTub::Pool do
                  net_http_thread_work(pool, 20, threads)
                end
                }.to_not raise_error
-          expect(pool.current_size).to be >= 5
-          expect(pool.current_size).to be <= 10
+          expect(pool.current_size).to be >= 4
+          expect(pool.current_size).to be <= 8
           results = threads.collect{ |t| t[:status]}
           expect(results.length).to eql(100) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
@@ -314,7 +314,7 @@ describe HotTub::Pool do
 
     context "sized without max" do
       let(:pool) do
-        HotTub::Pool.new(:size => 5) {
+        HotTub::Pool.new(:size => 4) {
           uri = URI.parse(HotTub::Server.url)
           http = Net::HTTP.new(uri.host, uri.port)
           http.use_ssl = false
@@ -340,7 +340,7 @@ describe HotTub::Pool do
                  net_http_thread_work(pool, 20, threads)
                end
                }.to_not raise_error
-          expect(pool.current_size).to be > 5 # make sure the pool grew beyond size
+          expect(pool.current_size).to be > 4 # make sure the pool grew beyond size
           results = threads.collect{ |t| t[:status]}
           expect(results.length).to eql(100) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
@@ -351,7 +351,7 @@ describe HotTub::Pool do
 
   context 'Excon' do
     it "should work" do
-      pool = HotTub::Pool.new(:size => 5, :max_size => 5) do
+      pool = HotTub::Pool.new(:size => 4, :max_size => 4) do
         Excon.new(HotTub::Server.url, :thread_safe_sockets => false)
       end
       failed = false
