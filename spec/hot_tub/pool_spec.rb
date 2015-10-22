@@ -303,7 +303,8 @@ describe HotTub::Pool do
                  net_http_thread_work(pool, 20, threads)
                end
                }.to_not raise_error
-          expect(pool.current_size).to eql(10)
+          expect(pool.current_size).to be >= 5
+          expect(pool.current_size).to be <= 10
           results = threads.collect{ |t| t[:status]}
           expect(results.length).to eql(100) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
