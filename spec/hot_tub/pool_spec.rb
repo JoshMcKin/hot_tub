@@ -258,12 +258,20 @@ describe HotTub::Pool do
         it "should work" do
           failed = false
           threads = []
-          expect { net_http_thread_work(pool,10, threads) }.to_not raise_error
+          expect { 5.times do
+                 net_http_thread_work(pool, 20, threads)
+               end
+               }.to_not raise_error
+          
           pool.reap!
-          expect { net_http_thread_work(pool,20, threads) }.to_not raise_error
+
+          expect { 5.times do
+                 net_http_thread_work(pool, 20, threads)
+               end
+               }.to_not raise_error
           expect(pool.current_size).to eql(5) # make sure the pool grew beyond size
           results = threads.collect{ |t| t[:status]}
-          expect(results.length).to eql(30) # make sure all threads are present
+          expect(results.length).to eql(200) # make sure all threads are present
           expect(results.uniq).to eql(['200']) # make sure all returned status 200
         end
       end
