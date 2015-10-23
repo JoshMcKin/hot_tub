@@ -90,10 +90,10 @@ module HotTub
       @reap_client      = opts[:reap]                     # => lambda {|clnt| clnt.reap?} or :reap? # should return boolean
       @new_client       = new_client
 
-      @pool             = []    # stores available clients
-      @pool.taint
-      @out              = []    # stores all checked out clients
-      @out.taint
+      @_pool             = []    # stores available clients
+      @_pool.taint
+      @_out              = []    # stores all checked out clients
+      @_out.taint
 
       @mutex            = Mutex.new
       @cond             = ConditionVariable.new
@@ -120,7 +120,7 @@ module HotTub
     # Its possible clients may be returned to the pool after cleaning
     def clean!
       @mutex.synchronize do
-        @pool.each do |clnt|
+        @_pool.each do |clnt|
           clean_client(clnt)
         end
       end
@@ -133,7 +133,7 @@ module HotTub
     def drain!
       @mutex.synchronize do
         begin
-          while clnt = (@pool.pop || @out.pop)
+          while clnt = (@_pool.pop || @_out.pop)
             close_client(clnt)
           end
         ensure
@@ -149,7 +149,7 @@ module HotTub
     def reset!
       @mutex.synchronize do
         begin
-          while clnt = (@pool.pop || @out.pop)
+          while clnt = (@_pool.pop || @_out.pop)
             close_client(clnt)
           end
           if @reaper
@@ -179,7 +179,7 @@ module HotTub
         break if @shutdown
         reaped = nil
         @mutex.synchronize do
-          reaped = @pool.shift if _reap?
+          reaped = @_pool.shift if _reap?
         end
         if reaped
           close_client(reaped)
@@ -230,9 +230,9 @@ module HotTub
       if clnt
         @mutex.synchronize do
           begin
-            if @out.delete(clnt)
+            if @_out.delete(clnt)
               unless @shutdown
-                @pool << clnt
+                @_pool << clnt
               end
             end
           ensure
@@ -253,8 +253,8 @@ module HotTub
         break if @shutdown
         raise_alarm if raise_alarm?(alarm)
         @mutex.synchronize do
-          if clnt = (@pool.pop || _fetch_new)
-            @out << clnt
+          if clnt = (@_pool.pop || _fetch_new)
+            @_out << clnt
           else
             @cond.wait(@mutex,@wait_timeout)
           end
@@ -269,7 +269,7 @@ module HotTub
     # and checked out. _total_current_size is volatile and
     # may be inaccurate if called outside @mutex.synchronize {}
     def _total_current_size
-      (@pool.length + @out.length)
+      (@_pool.length + @_out.length)
     end
 
     # Return true if we have reached our limit set by the :size option
@@ -290,7 +290,7 @@ module HotTub
     # _add is volatile; and may cause threading issues
     # if called outside @mutex.synchronize {}
     def _fetch_new
-      return nil unless (@pool.empty? && (never_block? || _less_than_size?|| _less_than_max?))
+      return nil unless (@_pool.empty? && (never_block? || _less_than_size?|| _less_than_max?))
       nc = @new_client.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool" if HotTub.logger
       nc
@@ -302,7 +302,7 @@ module HotTub
     # volatile; and may be inaccurate if called outside
     # @mutex.synchronize {}
     def _reap?
-      ( !@pool.empty? && !@shutdown && ((@pool.length > @size) || reap_client?(@pool[0])))
+      ( !@_pool.empty? && !@shutdown && ((@_pool.length > @size) || reap_client?(@_pool[0])))
     end
 
     ### END VOLATILE METHODS ###

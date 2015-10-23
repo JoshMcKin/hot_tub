@@ -15,9 +15,14 @@ module HotTub
     set :server, 'puma'
     set :port, 9595
 
-    get '/data' do
+    get '/fast' do
       sleep(0.01)
       "foo"
+    end
+
+    get '/slow' do
+      sleep(1)
+      "foooooooooooo"
     end
 
     def self.teardown
@@ -25,7 +30,11 @@ module HotTub
     end
 
     def self.url
-      'http://127.0.0.1:9595/data'
+      'http://127.0.0.1:9595/fast'
+    end
+
+    def self.slow_url
+      'http://127.0.0.1:9595/slow'
     end
   end
 
@@ -43,7 +52,7 @@ module HotTub
     set :server, 'puma'
     set :port, 9393
 
-    get '/foo' do
+    get '/fast' do
       sleep(0.01)
       "foo"
     end
@@ -53,7 +62,7 @@ module HotTub
     end
 
     def self.url
-      'http://127.0.0.1:9393/foo' 
+      'http://127.0.0.1:9393/fast' 
     end
   end
 end

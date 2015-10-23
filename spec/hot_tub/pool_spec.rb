@@ -42,7 +42,7 @@ describe HotTub::Pool do
     it "should remove connection from pool when doing work" do
       pool.run do |connection|
         conn = connection
-        expect(pool.instance_variable_get(:@pool).select{|c| c.object_id == conn.object_id}.length).to eql(0)
+        expect(pool.instance_variable_get(:@_pool).select{|c| c.object_id == conn.object_id}.length).to eql(0)
       end
     end
 
@@ -52,7 +52,7 @@ describe HotTub::Pool do
         conn = connection
       end
       # returned to pool after work was done
-      expect(pool.instance_variable_get(:@pool).pop).to eql(conn)
+      expect(pool.instance_variable_get(:@_pool).pop).to eql(conn)
     end
 
     it "should work" do
@@ -106,15 +106,15 @@ describe HotTub::Pool do
   describe '#drain!' do
     let(:pool) { HotTub::Pool.new(:size => 4) { MocClient.new } }
     before(:each) do
-      pool.instance_variable_set(:@out, [MocClient.new,MocClient.new,MocClient.new])
-      pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_out, [MocClient.new,MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_pool, [MocClient.new,MocClient.new,MocClient.new])
     end
 
 
     it "should drain pool" do
       pool.drain!
-      expect(pool.instance_variable_get(:@pool).length).to eql(0)
-      expect(pool.instance_variable_get(:@out).length).to eql(0)
+      expect(pool.instance_variable_get(:@_pool).length).to eql(0)
+      expect(pool.instance_variable_get(:@_out).length).to eql(0)
     end
   end
 
@@ -123,15 +123,15 @@ describe HotTub::Pool do
     let(:client) { MocClient.new }
 
     before(:each) do
-      pool.instance_variable_set(:@out, [client,MocClient.new,MocClient.new])
-      pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_out, [client,MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_pool, [MocClient.new,MocClient.new,MocClient.new])
     end
 
     it "should reset pool" do
       pool.reset!
       expect(client).to be_closed
-      expect(pool.instance_variable_get(:@pool).length).to eql(0)
-      expect(pool.instance_variable_get(:@out).length).to eql(0)
+      expect(pool.instance_variable_get(:@_pool).length).to eql(0)
+      expect(pool.instance_variable_get(:@_out).length).to eql(0)
     end
   end
 
@@ -139,10 +139,10 @@ describe HotTub::Pool do
     let(:pool) { HotTub::Pool.new(:size => 3, :clean => lambda { |clnt| clnt.clean}) { MocClient.new } }
 
     it "should clean pool" do
-      pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
-      expect(pool.instance_variable_get(:@pool).first).to_not be_cleaned
+      pool.instance_variable_set(:@_pool, [MocClient.new,MocClient.new,MocClient.new])
+      expect(pool.instance_variable_get(:@_pool).first).to_not be_cleaned
       pool.clean!
-      pool.instance_variable_get(:@pool).each do |clnt|
+      pool.instance_variable_get(:@_pool).each do |clnt|
         expect(clnt).to be_cleaned
       end
     end
@@ -158,9 +158,9 @@ describe HotTub::Pool do
     end
 
     it "should shutdown pool" do
-      pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_pool, [MocClient.new,MocClient.new,MocClient.new])
       pool.shutdown!
-      expect(pool.instance_variable_get(:@pool).length).to eql(0)
+      expect(pool.instance_variable_get(:@_pool).length).to eql(0)
       expect(pool.send(:_total_current_size)).to eql(0)
     end
   end
@@ -170,7 +170,7 @@ describe HotTub::Pool do
       pool = HotTub::Pool.new({ :size => 1, :close => :close }) { MocClient.new }
       old_client = MocClient.new
       pool.instance_variable_set(:@last_activity,(Time.now - 601))
-      pool.instance_variable_set(:@pool, [old_client, MocClient.new, MocClient.new])
+      pool.instance_variable_set(:@_pool, [old_client, MocClient.new, MocClient.new])
       pool.reap!
       expect(pool.current_size).to eql(1)
       expect(old_client).to be_closed
@@ -206,21 +206,21 @@ describe HotTub::Pool do
         it "should push client back to pool" do
           clnt = pool.send(:pop)
           pool.send(:push,clnt)
-          expect(pool.instance_variable_get(:@pool).include?(clnt)).to eql(true)
+          expect(pool.instance_variable_get(:@_pool).include?(clnt)).to eql(true)
         end
       end
       context "client is not registered" do
         it "should push client back to pool" do
           clnt = pool.send(:pop)
-          pool.instance_variable_get(:@out).delete(clnt)
+          pool.instance_variable_get(:@_out).delete(clnt)
           pool.send(:push,clnt)
-          expect(pool.instance_variable_get(:@pool).include?(clnt)).to eql(false)
+          expect(pool.instance_variable_get(:@_pool).include?(clnt)).to eql(false)
         end
       end
       context "client is nil" do
         it "should not push client back to pool" do
           pool.send(:push,nil)
-          expect(pool.instance_variable_get(:@pool).include?(nil)).to eql(false)
+          expect(pool.instance_variable_get(:@_pool).include?(nil)).to eql(false)
         end
       end
     end

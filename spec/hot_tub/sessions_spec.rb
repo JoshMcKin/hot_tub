@@ -94,7 +94,7 @@ describe HotTub::Sessions do
       sessions.sessions('bar')
       sessions.clean!
       sessions.instance_variable_get(:@sessions).each_pair do |k,v|
-        v.instance_variable_get(:@pool).each do |c|
+        v.instance_variable_get(:@_pool).each do |c|
           expect(c).to be_cleaned
         end
       end
@@ -118,7 +118,7 @@ describe HotTub::Sessions do
       sessions.sessions('bar')
       sessions.reap!
       sessions.instance_variable_get(:@sessions).each_pair do |k,v|
-        v.instance_variable_get(:@pool).each do |c|
+        v.instance_variable_get(:@_pool).each do |c|
           expect(c).to be_reaped
         end
       end
