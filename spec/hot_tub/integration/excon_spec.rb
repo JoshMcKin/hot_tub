@@ -94,7 +94,7 @@ describe HotTub do
   context "shutdown with slow client" do
     let(:pool) do
       HotTub.new(:size => 1) {
-        Excon.new(HotTub::Server.slow_url, :thread_safe_sockets => false)
+        Excon.new(HotTub::Server.slow_url, :thread_safe_sockets => false, :read_timeout => 2)
       }
     end
 
