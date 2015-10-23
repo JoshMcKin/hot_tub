@@ -265,18 +265,6 @@ module HotTub
 
     ### START VOLATILE METHODS ###
 
-    # _empty? is volatile; and may cause be inaccurate
-    # if called outside @mutex.synchronize {}
-    def _empty?
-      @pool.empty?
-    end
-
-    # _space? is volatile; and may be inaccurate
-    # if called outside @mutex.synchronize {}
-    def _space?
-      !_empty?
-    end
-
     # Returns the total number of clients in the pool
     # and checked out. _total_current_size is volatile and
     # may be inaccurate if called outside @mutex.synchronize {}
@@ -298,19 +286,11 @@ module HotTub
       (_total_current_size < @max_size)
     end
 
-    # We only want to add a client if the pool is empty in keeping with
-    # a lazy model. If the pool is empty we can only add clients if
-    # never_block? is true or there is room to grow. _add? is volatile;
-    # and may be in accurate if called outside @mutex.synchronize {}
-    def _fetch_new?
-      (_empty? && (never_block? || _less_than_size?|| _less_than_max?))
-    end
-
     # Adds a new client to the pool if its allowed
     # _add is volatile; and may cause threading issues
     # if called outside @mutex.synchronize {}
     def _fetch_new
-      return nil unless _fetch_new?
+      return nil unless (@pool.empty? && (never_block? || _less_than_size?|| _less_than_max?))
       nc = @new_client.call
       HotTub.logger.info "Adding HotTub client: #{nc.class.name} to pool" if HotTub.logger
       nc
@@ -322,15 +302,7 @@ module HotTub
     # volatile; and may be inaccurate if called outside
     # @mutex.synchronize {}
     def _reap?
-      (_space? && !@shutdown && (_overflow? || reap_client?(@pool[0])))
-    end
-
-    # Returns true if the pool is greater than the :size option and the
-    # pool has been stagnant long enough to allow for reaping (we don't
-    # want to reap under load). _overflow_expired? is volatile; and may
-    # be inaccurate if called outside @mutex.synchronize {}
-    def _overflow?
-      (@pool.length > @size)
+      ( !@pool.empty? && !@shutdown && ((@pool.length > @size) || reap_client?(@pool[0])))
     end
 
     ### END VOLATILE METHODS ###

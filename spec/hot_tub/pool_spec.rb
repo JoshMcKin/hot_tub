@@ -68,6 +68,41 @@ describe HotTub::Pool do
     end
   end
 
+  describe ':max_size option' do
+
+    context 'is default' do
+      it "should add clients to pool as necessary" do
+        pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
+        threads = []
+        5.times.each do
+          threads << Thread.new do
+            pool.run{|cltn| cltn.get }
+          end
+        end
+        threads.each do |t|
+          t.join
+        end
+        expect(pool.send(:_total_current_size)).to be > 1
+      end
+    end
+
+    context 'is set' do
+      it "should not add clients to pool beyond specified size" do
+        pool = HotTub::Pool.new({:size => 1, :max_size => 1, :wait_timeout => 100}) { MocClient.new }
+        threads = []
+        5.times.each do
+          threads << Thread.new do
+            pool.run{|cltn| cltn.get }
+          end
+        end
+        threads.each do |t|
+          t.join
+        end
+        expect(pool.send(:_total_current_size)).to eql(1)
+      end
+    end
+  end
+
   describe '#drain!' do
     let(:pool) { HotTub::Pool.new(:size => 4) { MocClient.new } }
     before(:each) do
@@ -76,7 +111,7 @@ describe HotTub::Pool do
     end
 
 
-    it "should reset pool" do
+    it "should drain pool" do
       pool.drain!
       expect(pool.instance_variable_get(:@pool).length).to eql(0)
       expect(pool.instance_variable_get(:@out).length).to eql(0)
@@ -122,7 +157,7 @@ describe HotTub::Pool do
       expect(pool.instance_variable_get(:@reaper)).to be_nil
     end
 
-    it "should reset pool" do
+    it "should shutdown pool" do
       pool.instance_variable_set(:@pool, [MocClient.new,MocClient.new,MocClient.new])
       pool.shutdown!
       expect(pool.instance_variable_get(:@pool).length).to eql(0)
@@ -158,38 +193,26 @@ describe HotTub::Pool do
       end
     end
 
-    describe '_fetch_new?' do
-      it "should be true if @pool_data[:length] is less than desired pool size and the pool is empty?"do
-        pool.instance_variable_set(:@pool,[])
-        expect(pool.send(:_fetch_new?)).to eql(true)
-      end
-
-      it "should be false pool has reached pool_size" do
-        pool.instance_variable_set(:@size, 5)
-        pool.instance_variable_set(:@pool,[1,1,1,1,1])
-        expect(pool.send(:_fetch_new?)).to eql(false)
-      end
-    end
-
-    describe '#_fetch_new' do
-      it "should add return a client"do
-        pre_add_length = pool.instance_variable_get(:@pool).length
-        expect(pool.send(:_fetch_new)).to_not be_nil
+    describe '#pop' do
+      context "is allowed" do
+        it "should work" do
+          expect(pool.send(:pop)).to be_a(MocClient)
+        end
       end
     end
 
     describe '#push' do
       context "client is registered" do
         it "should push client back to pool" do
-          clnt = pool.send(:_fetch_new)
-          pool.instance_variable_get(:@out) << clnt
+          clnt = pool.send(:pop)
           pool.send(:push,clnt)
           expect(pool.instance_variable_get(:@pool).include?(clnt)).to eql(true)
         end
       end
       context "client is not registered" do
         it "should push client back to pool" do
-          clnt = pool.send(:_fetch_new)
+          clnt = pool.send(:pop)
+          pool.instance_variable_get(:@out).delete(clnt)
           pool.send(:push,clnt)
           expect(pool.instance_variable_get(:@pool).include?(clnt)).to eql(false)
         end
@@ -199,39 +222,6 @@ describe HotTub::Pool do
           pool.send(:push,nil)
           expect(pool.instance_variable_get(:@pool).include?(nil)).to eql(false)
         end
-      end
-    end
-  end
-
-  context ':max_size' do
-    context 'is default' do
-      it "should add clients to pool as necessary" do
-        pool = HotTub::Pool.new({:size => 1}) { MocClient.new }
-        threads = []
-        5.times.each do
-          threads << Thread.new do
-            pool.run{|cltn| cltn.get }
-          end
-        end
-        threads.each do |t|
-          t.join
-        end
-        expect(pool.send(:_total_current_size)).to be > 1
-      end
-    end
-    context 'is set' do
-      it "should not add clients to pool beyond specified size" do
-        pool = HotTub::Pool.new({:size => 1, :max_size => 1, :wait_timeout => 100}) { MocClient.new }
-        threads = []
-        5.times.each do
-          threads << Thread.new do
-            pool.run{|cltn| cltn.get }
-          end
-        end
-        threads.each do |t|
-          t.join
-        end
-        expect(pool.send(:_total_current_size)).to eql(1)
       end
     end
   end
