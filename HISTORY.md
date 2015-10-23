@@ -4,7 +4,14 @@ HotTub Changelog
 Head
 =======
 
-- Nothing yet
+0.4.0
+=======
+- Hide HotTub::Sessions, should only be used with HotTub::Pool, otherwise just use ThreadSafe::Cache directly
+- Reaper is now just a thread, and make sure we abort on exception
+- add #reset! to Pool and Session for use after forking
+- Test slow shutdowns
+- Move integration tests and isolate
+- General refactoring
 
 0.3.0
 =======

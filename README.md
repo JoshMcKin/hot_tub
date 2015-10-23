@@ -43,7 +43,6 @@ Configure Logger by creating `config\initializers\hot_tub.rb` and adding the fol
 
 # Usage 
 
-## HotTub
 For convenience you can initialize a new HotTub::Pool by calling HotTub.new or HotTub::Pool.new directly.
 Returns an instance of HotTub::Pool.
 
