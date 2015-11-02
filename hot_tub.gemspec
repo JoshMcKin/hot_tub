@@ -9,12 +9,10 @@ Gem::Specification.new do |s|
   s.email       = ["joshmckin@gmail.com"]
   s.homepage    = "https://github.com/JoshMcKin/hot_tub"
   s.license     = "MIT"
-  s.summary     = %q{A dynamic thread-safe pooling gem.}
-  s.description = %q{A dynamic thread-safe pooling gem, when you need more than a standard static pool.}
+  s.summary     = %q{Flexible connection pooling for Ruby.}
+  s.description = %q{Flexible connection pooling for Ruby.}
 
   s.rubyforge_project = "hot_tub"
-
-  s.add_runtime_dependency "thread_safe"
   
   s.add_development_dependency "rspec"
   s.add_development_dependency "rspec-autotest"

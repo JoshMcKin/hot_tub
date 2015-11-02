@@ -15,7 +15,7 @@ module HotTub
             break if obj.shutdown
             sleep(obj.reap_timeout || 600)
           rescue Exception => e
-            HotTub.logger.error "HotTub::Reaper for #{obj.class.name} terminated with exception: #{e.message}" if HotTub.logger
+            HotTub.logger.error "[HotTub] Reaper for #{obj.class.name} terminated with exception: #{e.message}" if HotTub.logger
             HotTub.logger.error e.backtrace.map {|line| " #{line}"} if HotTub.logger
             break
           end
@@ -28,7 +28,19 @@ module HotTub
 
     # Mixin to dry up Reaper usage
     module Mixin
-      attr_reader :reap_timeout, :reaper, :shutdown
+      attr_reader :reap_timeout, :shutdown, :reaper
+
+      # Setting reaper kills the current reaper. 
+      # If the values is truthy a new HotTub::Reaper
+      # is created.
+      def reaper=reaper
+        kill_reaper
+        if reaper 
+          @reaper = HotTub::Reaper.new(self)
+        else
+          @reaper = false
+        end
+      end
 
       def reap!
         raise NoMethodError.new('#reap! must be redefined in your class')

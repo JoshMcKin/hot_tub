@@ -14,14 +14,20 @@ module HotTub
         }
       }
     }
+
     # Attempts to clean the provided client, checking the options first for a clean block
     # then checking the known clients
     def clean_client(clnt)
-      begin
-        action = (@clean_client || known_client_action(clnt,:clean))
-        preform_client_action(clnt,action) if action
-      rescue => e
-        HotTub.logger.error "There was an error cleaning one of your #{self.class.name} clients: #{e}" if HotTub.logger
+      if @clean_client
+        begin
+          if @clean_client.is_a?(Proc)
+            preform_client_block(clnt,&@clean_client)
+          else
+            preform_client_method(clnt,@clean_client)
+          end
+        rescue => e
+          HotTub.logger.error "[HotTub] There was an error cleaning one of your #{self.class.name} clients: #{e}" if HotTub.logger
+        end
       end
       clnt
     end
@@ -29,24 +35,36 @@ module HotTub
     # Attempts to close the provided client, checking the options first for a close block
     # then checking the known clients
     def close_client(clnt)
-      begin
-        action = (@close_client || known_client_action(clnt,:close))
-        preform_client_action(clnt,action) if action
-      rescue => e
-        HotTub.logger.error "There was an error closing one of your #{self.class.name} clients: #{e}" if HotTub.logger
+      @close_action = (@close_client || known_client_action(clnt,:close) || false) if @close_action.nil?
+      if @close_action
+        begin
+          if @close_action.is_a?(Proc)
+            preform_client_block(clnt,&@close_action)
+          else
+            preform_client_method(clnt,@close_action)
+          end
+        rescue => e
+          HotTub.logger.error "[HotTub] There was an error closing one of your #{self.class.name} clients: #{e}" if HotTub.logger
+        end
       end
       nil
     end
 
     # Attempts to determine if a client should be reaped, block should return a boolean
     def reap_client?(clnt)
-      begin
-        action = (@reap_client || known_client_action(clnt,:reap))
-        return preform_client_action(clnt,action) if action
-      rescue => e
-        HotTub.logger.error "There was an error reaping one of your #{self.class.name} clients: #{e}" if HotTub.logger
+      rc = false
+      if @reap_client
+        begin
+          if @reap_client.is_a?(Proc)
+            rc = preform_client_block(clnt,&@reap_client)
+          else
+            rc = preform_client_method(clnt,@reap_client)
+          end
+        rescue => e
+          HotTub.logger.error "[HotTub] There was an error reaping one of your #{self.class.name} clients: #{e}" if HotTub.logger
+        end
       end
-      false
+      rc
     end
 
     private
@@ -55,13 +73,12 @@ module HotTub
       (KNOWN_CLIENTS[clnt.class.name] && KNOWN_CLIENTS[clnt.class.name][key])
     end
 
-    def preform_client_action(clnt,action)
-      if action.is_a?(Proc)
-        return action.call(clnt)
-      elsif action.is_a?(Symbol)
-        return clnt.send(action)
-      end
-      false
+    def preform_client_block(clnt,action=nil)
+      yield clnt
+    end
+
+    def preform_client_method(clnt,action=nil)
+      clnt.send(action)
     end
   end
 end

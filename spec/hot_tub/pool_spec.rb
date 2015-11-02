@@ -13,7 +13,7 @@ describe HotTub::Pool do
     end
 
     it "should have set the client" do
-      expect(pool.instance_variable_get(:@new_client).call).to be_a(MocClient)
+      expect(pool.instance_variable_get(:@client_block).call).to be_a(MocClient)
     end
 
     it "should be true" do
@@ -61,11 +61,6 @@ describe HotTub::Pool do
       expect(result).to_not be_nil
     end
 
-    context 'block not given' do
-      it "should raise ArgumentError" do
-        expect { pool.run }.to raise_error(ArgumentError)
-      end
-    end
   end
 
   describe ':max_size option' do
@@ -123,8 +118,8 @@ describe HotTub::Pool do
     let(:client) { MocClient.new }
 
     before(:each) do
-      pool.instance_variable_set(:@_out, [client,MocClient.new,MocClient.new])
-      pool.instance_variable_set(:@_pool, [MocClient.new,MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_out, [MocClient.new,MocClient.new])
+      pool.instance_variable_set(:@_pool, [client,MocClient.new,MocClient.new])
     end
 
     it "should reset pool" do
@@ -178,20 +173,7 @@ describe HotTub::Pool do
   end
 
   context 'private methods' do
-    let(:pool) { HotTub::Pool.new { MocClient.new}  }
-
-    describe '#client' do
-      it "should raise HotTub::BlockingTimeout if an available is not found in time"do
-        pool.instance_variable_set(:@non_blocking,false)
-        pool.instance_variable_set(:@wait_timeout, 0.1)
-        allow(pool).to receive(:raise_alarm?).and_return(true)
-        expect { puts pool.send(:pop) }.to raise_error(HotTub::Pool::Timeout)
-      end
-
-      it "should return an instance of the client" do
-        expect(pool.send(:client)).to be_instance_of(MocClient)
-      end
-    end
+    let(:pool) { HotTub::Pool.new(:close => :close) { MocClient.new}  }
 
     describe '#pop' do
       context "is allowed" do
@@ -211,10 +193,10 @@ describe HotTub::Pool do
       end
       context "client is not registered" do
         it "should push client back to pool" do
-          clnt = pool.send(:pop)
-          pool.instance_variable_get(:@_out).delete(clnt)
+          clnt = MocClient.new
           pool.send(:push,clnt)
           expect(pool.instance_variable_get(:@_pool).include?(clnt)).to eql(false)
+          expect(clnt).to be_closed
         end
       end
       context "client is nil" do
@@ -230,17 +212,16 @@ describe HotTub::Pool do
     it "should grow" do
       pool = HotTub::Pool.new({:size => 4}) { MocClient.new }
       failed = false
-      expect {
-        threads = []
-        20.times.each do
-          threads << Thread.new do
-            pool.run{|connection| connection.get }
-          end
+      threads = []
+      20.times.each do
+        threads << Thread.new do
+          pool.run{|connection| connection.get }
         end
-        threads.each do |t|
-          t.join
-        end
-      }.to_not raise_error
+      end
+      sleep(0.01)
+      threads.each do |t|
+        t.join
+      end
       expect(pool.current_size).to be >= 4
     end
   end

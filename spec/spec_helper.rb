@@ -17,6 +17,8 @@ end
 # in ./support/ and its subdirectories.
 # Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each {|f| require f}
 # HotTub.logger = Logger.new(STDOUT)
+# HotTub.trace = true
+
 RSpec.configure do |config|
   config.before(:suite) do
     HotTub::Server.run

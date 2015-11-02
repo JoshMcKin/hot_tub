@@ -3,128 +3,161 @@ module HotTub
   class Sessions
     include HotTub::KnownClients
     include HotTub::Reaper::Mixin
+    attr_accessor :name
 
-    # HotTub::Session is a ThreadSafe::Cache where URLs are mapped HotTub::Pools.
-    #
+    # HotTub::Sessions simplifies managing multiple Pools in a single object
+    # and using a single Reaper.
     #
     # == Example:
-    # You can initialize a HotTub::Pool with each client by passing :with_pool as true and any pool options
-    #   sessions = HotTub::Sessions.new(:size => 12) {
-    #       uri = URI.parse("http://somewebservice.com")
-    #       http = Net::HTTP.new(uri.host, uri.port)
-    #       http.use_ssl = false
-    #       http.start
-    #       http
-    #     }
     #
-    #   sessions.run("http://wwww.yahoo.com") do |conn|
+    #   url  = "http://somewebservice.com"
+    #   url2 = "http://somewebservice2.com"
+    #
+    #   sessions = HotTub::Sessions
+    #   sessions.add(url,{:size => 12}) {
+    #     uri = URI.parse(url)
+    #     http = Net::HTTP.new(uri.host, uri.port)
+    #     http.use_ssl = false
+    #     http.start
+    #     http
+    #    }
+    #   sessions.add(url2,{:size => 5}) {
+    #     Excon.new(url2)
+    #    }
+    #
+    #   sessions.run(url) do |conn|
     #     p conn.head('/').code
     #   end
     #
-    #   sessions.run("https://wwww.google.com") do |conn|
+    #   sessions.run(url2) do |conn|
     #     p conn.head('/').code
     #   end
     #
     # === OPTIONS
-    # [:close]
-    #   Default is nil. Can be a symbol representing an method to call on a client to close the client or a lambda
-    #   that accepts the client as a parameter that will close a client. The close option is performed on clients
-    #   on reaping and shutdown after the client has been removed from the pool.  When nil, as is the default, no
-    #   action is performed.
-    # [:clean]
-    #   Default is nil. Can be a symbol representing an method to call on a client to clean the client or a lambda
-    #   that accepts the client as a parameter that will clean a client. When nil, as is the default, no action is
-    #   performed.
-    # [:reap]
-    #   Default is nil. Can be a symbol representing an method to call on a client that returns a boolean marking
-    #   a client for reaping, or a lambda that accepts the client as a parameter that returns a boolean boolean
-    #   marking a  client for reaping. When nil, as is the default, no action is performed.
-    # [:no_reaper]
-    #   Default is nil. A boolean like value that if true prevents the reaper from initializing
+    #   [:name]
+    #     A string representing the name of your sessions used for logging.
     #
-    def initialize(opts={},&new_client)
-      raise ArgumentError, "HotTub::Sessions require a block on initialization that accepts a single argument" unless block_given?
-      @close_client     = opts[:close]            # => lambda {|clnt| clnt.close}
-      @clean_client     = opts[:clean]            # => lambda {|clnt| clnt.clean}
-      @reap_client      = opts[:reap]             # => lambda {|clnt| clnt.reap?}  # should return boolean
-      @new_client       = new_client              # => { |url| MyClient.new(url) } # block that accepts a url param
-      @sessions         = ThreadSafe::Cache.new
+    #   [:reaper]
+    #     If set to false prevents a HotTub::Reaper from initializing.
+    #
+    #   [:reap_timeout]
+    #     Default is 600 seconds. An integer that represents the timeout for reaping the pool in seconds.
+    #
+    def initialize(opts={})
+      @name             = (opts[:name] || self.class.name)
+      @reaper           = opts[:reaper]
+      @reap_timeout     = (opts[:reap_timeout] || 600)
+
+      @_sessions        = {}
+      @mutex            = Mutex.new
       @shutdown         = false
-      @reap_timeout     = (opts[:reap_timeout] || 600)      # the interval to reap connections in seconds
-      @reaper           = Reaper.spawn(self) unless opts[:no_reaper]
-      @pool_options     = {:no_reaper => true}.merge(opts)
-      at_exit {drain!}
+
+      at_exit {shutdown!}
     end
 
-    # Safely initializes sessions
-    # expects a url string or URI
-    def session(url)
-      key = to_key(url)
-      return @sessions.get(key) if @sessions.get(key)
-      @sessions.compute_if_absent(key) {
-        HotTub::Pool.new(@pool_options) { @new_client.call(url) }
-      }
-      @sessions.get(key)
+    # Adds a new HotTub::Pool for the given key unless
+    # one already exists.
+    def add(key, pool_options={}, &client_block)
+      raise ArgumentError, 'a block that initializes a new client is required.' unless block_given?
+      pool = nil
+      return pool if pool = @_sessions[key]
+      pool_options[:sessions] = true
+      pool_options[:name] = "#{@name} - #{key}"
+      @mutex.synchronize do
+        @reaper ||= Reaper.spawn(self) if @reaper.nil?
+        pool = @_sessions[key] ||= HotTub::Pool.new(pool_options, &client_block) unless @shutdown
+      end
+      pool
     end
-    alias :sessions :session
 
-    def run(url,&block)
-      session = sessions(url)
-      session.run(&block) if session
+    # Deletes and shutdowns the pool if its found.
+    def delete(key)
+      deleted = false
+      pool = nil
+      @mutex.synchronize do
+        pool = @_sessions.delete(key)
+      end
+      if pool
+        pool.reset!
+        deleted = true
+        HotTub.logger.info "[HotTub] #{key} was deleted from #{@name}." if HotTub.logger
+      end
+      deleted
+    end
+
+    def fetch(key)
+      pool = @_sessions[key]
+      raise MissingSession, "A session could not be found for #{key.inspect} #{@name}" unless pool
+      pool
+    end
+
+    alias :[] :fetch
+
+    def run(url, &run_block)
+      pool = fetch(url)
+      pool.run &run_block
     end
 
     def clean!
-      @sessions.each_pair do |key,pool|
-        pool.clean!
+      HotTub.logger.info "[HotTub] Cleaning #{@name}!" if HotTub.logger
+      @mutex.synchronize do
+        @_sessions.each_value do |pool|
+          break if @shutdown
+          pool.clean!
+        end
       end
-      @sessions
+      nil
     end
 
     def drain!
-      @sessions.each_pair do |key,pool|
-        pool.drain!
+      HotTub.logger.info "[HotTub] Draining #{@name}!" if HotTub.logger
+      @mutex.synchronize do
+        @_sessions.each_value do |pool|
+          break if @shutdown
+          pool.drain!
+        end
       end
-      @sessions
+      nil
     end
 
     def reset!
-      @sessions.each_pair do |key,pool|
-        pool.reset!
+      HotTub.logger.info "[HotTub] Resetting #{@name}!" if HotTub.logger
+      @mutex.synchronize do
+        @_sessions.each_value do |pool|
+          break if @shutdown
+          pool.reset!
+        end
       end
-      @sessions.clear
-      @sessions = ThreadSafe::Cache.new
-      @sessions
+      nil
     end
 
     def shutdown!
       @shutdown = true
+      HotTub.logger.info "[HotTub] Shutting down #{@name}!" if HotTub.logger
       begin
         kill_reaper
       ensure
-        drain!
-        @sessions = nil
+        @mutex.synchronize do
+          @_sessions.each_value do |pool|
+            pool.shutdown!
+          end
+        end
       end
       nil
     end
 
     # Remove and close extra clients
     def reap!
-      @sessions.each_pair do |key,pool|
-        pool.reap!
+      HotTub.logger.info "[HotTub] Reaping #{@name}!" if HotTub.log_trace?
+      @mutex.synchronize do
+        @_sessions.each_value do |pool|
+          break if @shutdown
+          pool.reap!
+        end
       end
+      nil
     end
 
-    private
-
-    def to_key(url)
-      if url.is_a?(String)
-        uri = URI(url)
-      elsif url.is_a?(URI)
-        uri = url
-      else
-        raise ArgumentError, "you must pass a string or a URI object"
-      end
-      "#{uri.scheme}://#{uri.host}:#{uri.port}"
-    end
+    MissingSession = Class.new(Exception)
   end
 end

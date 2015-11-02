@@ -12,17 +12,17 @@ describe HotTub do
     let(:threads) { [] }
 
     before(:each) do
-      5.times do
-        excon_thread_work(pool, 30, threads)
+      20.times do
+        excon_thread_work(pool, 10, threads)
       end
     end
 
-    it { expect(pool.current_size).to eql(4) }# make sure the pool grew beyond size
+    it { expect(pool.current_size).to eql(4) }
 
     it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(150) # make sure all threads are present
-      expect(results.uniq).to eql([200]) # make sure all returned status 200
+      expect(results.length).to eql(200)
+      expect(results.uniq).to eql([200])
     end
 
     it "should shutdown" do
@@ -41,8 +41,8 @@ describe HotTub do
     let(:threads) { [] }
 
     before(:each) do
-      5.times do
-        excon_thread_work(pool, 30, threads)
+      20.times do
+        excon_thread_work(pool, 10, threads)
       end
     end
 
@@ -52,13 +52,13 @@ describe HotTub do
 
     it "should reap" do
       pool.reap!
-      expect(pool.current_size).to eql(4)
+      expect(pool.current_size).to be <= 4 
     end
 
     it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(150) # make sure all threads are present
-      expect(results.uniq).to eql([200]) # make sure all returned status 200
+      expect(results.length).to eql(200)
+      expect(results.uniq).to eql([200])
     end
   end
 
@@ -72,12 +72,12 @@ describe HotTub do
     let(:threads) { [] }
 
     before(:each) do
-      5.times do
-        excon_thread_work(pool, 30, threads)
+      20.times do
+        excon_thread_work(pool, 10, threads)
       end
     end
 
-    it { expect(pool.current_size).to be > 4 }# make sure the pool grew beyond size
+    it { expect(pool.current_size).to be > 4 }
 
     it "should reap" do
       pool.reap!
@@ -86,8 +86,8 @@ describe HotTub do
 
     it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(150) # make sure all threads are present
-      expect(results.uniq).to eql([200]) # make sure all returned status 200
+      expect(results.length).to eql(200)
+      expect(results.uniq).to eql([200])
     end
   end
 
@@ -99,13 +99,10 @@ describe HotTub do
     end
 
     it "should work" do
-      conn = nil
-
       begin
         th = Thread.new do
           uri = URI.parse(HotTub::Server.slow_url)
           pool.run do |connection|
-            conn = connection
             connection.get(:path => uri.path).status
           end
         end
@@ -118,13 +115,10 @@ describe HotTub do
 
       expect(pool.shutdown).to eql(true)
       expect(pool.current_size).to eql(0)
-      expect(conn.send(:sockets)).to be_empty
     end
   end
 
 end
-
-
 
 def excon_thread_work(pool,thread_count=0, threads=[])
   thread_count.times.each do

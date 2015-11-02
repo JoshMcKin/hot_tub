@@ -15,17 +15,17 @@ describe HotTub do
     let(:threads) { [] }
 
     before(:each) do
-      5.times do
-        net_http_thread_work(pool, 30, threads)
+      20.times do
+        net_http_thread_work(pool, 10, threads)
       end
     end
 
-    it { expect(pool.current_size).to eql(4) } # make sure the pool grew beyond size
+    it { expect(pool.current_size).to eql(4) }
 
     it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(150) # make sure all threads are present
-      expect(results.uniq).to eql(['200']) # make sure all returned status 200
+      expect(results.length).to eql(200)
+      expect(results.uniq).to eql(['200'])
     end
 
     it "should shutdown" do
@@ -48,8 +48,8 @@ describe HotTub do
     let(:threads) { [] }
 
     before(:each) do
-      5.times do
-        net_http_thread_work(pool, 30, threads)
+      20.times do
+        net_http_thread_work(pool, 10, threads)
       end
     end
 
@@ -57,8 +57,8 @@ describe HotTub do
     it { expect(pool.current_size).to be <= 8 }
     it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(150) # make sure all threads are present
-      expect(results.uniq).to eql(['200']) # make sure all returned status 200
+      expect(results.length).to eql(200)
+      expect(results.uniq).to eql(['200'])
     end
   end
 
@@ -76,17 +76,17 @@ describe HotTub do
     let(:threads) { [] }
 
     before(:each) do
-      5.times do
-        net_http_thread_work(pool, 30, threads)
+      20.times do
+        net_http_thread_work(pool, 10, threads)
       end
     end
 
-    it { expect(pool.current_size).to be > 4 } # make sure the pool grew beyond size
+    it { expect(pool.current_size).to be > 4 }
 
     it "should work" do
       results = threads.collect{ |t| t[:status]}
-      expect(results.length).to eql(150) # make sure all threads are present
-      expect(results.uniq).to eql(['200']) # make sure all returned status 200
+      expect(results.length).to eql(200)
+      expect(results.uniq).to eql(['200'])
     end
   end
 end

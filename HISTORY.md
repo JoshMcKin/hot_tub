@@ -3,6 +3,12 @@ HotTub Changelog
 
 Head
 =======
+- Drop Thread::Safe dependency
+- Make Sessions useful, complete re-write and provide global sessions support
+- Refactor and clean up Pool
+- Improve logging and add HotTub.trace for more detailed logs
+- Name your pools and sessions for better logging
+- Remove :on_reaper in favor of setting :reaper to false
 
 0.4.0
 =======
