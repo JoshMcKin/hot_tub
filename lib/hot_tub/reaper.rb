@@ -53,6 +53,10 @@ module HotTub
           @reaper = nil
         end
       end
+
+      def spawn_reaper
+        Reaper.spawn(self)
+      end
     end
   end
 end

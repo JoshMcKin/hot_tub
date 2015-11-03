@@ -112,7 +112,7 @@ module HotTub
 
       @shutdown         = false
       @blocking_reap    = (opts[:reaper] == false && !opts[:sessions])
-      @reaper           = Reaper.spawn(self) unless (opts[:sessions] || (opts[:reaper] == false))
+      @reaper           = spawn_reaper unless (opts[:sessions] || (opts[:reaper] == false))
 
       @never_block      = (@max_size == 0)
 
@@ -171,7 +171,7 @@ module HotTub
           end
           if @reaper
             kill_reaper
-            @reaper = Reaper.spawn(self)
+            @reaper = spawn_reaper
           end
         ensure
           @_out.clear

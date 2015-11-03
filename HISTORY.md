@@ -3,6 +3,10 @@ HotTub Changelog
 
 Head
 =======
+- Add spawn_reaper to Reaper::Mixin.
+
+0.5.0
+=======
 - Drop Thread::Safe dependency
 - Make Sessions useful, complete re-write and provide global sessions support
 - Refactor and clean up Pool

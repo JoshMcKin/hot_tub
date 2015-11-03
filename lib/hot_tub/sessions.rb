@@ -64,7 +64,7 @@ module HotTub
       pool_options[:sessions] = true
       pool_options[:name] = "#{@name} - #{key}"
       @mutex.synchronize do
-        @reaper ||= Reaper.spawn(self) if @reaper.nil?
+        @reaper ||= spawn_reaper if @reaper.nil?
         pool = @_sessions[key] ||= HotTub::Pool.new(pool_options, &client_block) unless @shutdown
       end
       pool
