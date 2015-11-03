@@ -21,7 +21,6 @@ Head
 
 0.3.0
 =======
-
 - Drop EM support, will move to separate gem
 - Simplify API with HotTub.new
 - Use ThreadSafe::Cache for sessions
