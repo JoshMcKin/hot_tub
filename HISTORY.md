@@ -3,6 +3,13 @@ HotTub Changelog
 
 Head
 =======
+
+0.5.2
+=======
+- Fix logger error
+
+0.5.1
+=======
 - Add spawn_reaper to Reaper::Mixin.
 
 0.5.0

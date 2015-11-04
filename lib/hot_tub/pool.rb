@@ -304,8 +304,9 @@ module HotTub
     # if called outside @mutex.synchronize {}
     def _fetch_new
       if (@never_block || (_total_current_size < @max_size))
+        nc = yield
         HotTub.logger.info "[HotTub] Adding client: #{nc.class.name} to #{@name}." if HotTub.log_trace?
-        yield        
+        nc         
       end
     end
 
