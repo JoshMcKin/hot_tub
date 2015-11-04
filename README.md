@@ -69,9 +69,9 @@ A global Sessions object is available from the HotTub module and has several hel
     # we are not setting :max_size so our connections will grow to match our currency.
     # Once load dies down our pool will be reaped back down to 12 connections
 
-    url = "https://google.com"
-    HotTub.add(url, { :size => 12 }) do 
-      uri = URI.parse(url)
+    URL = "https://google.com"
+    pool = HotTub.add(URL, { :size => 12 }) do 
+      uri = URI.parse(URL)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
       http.start
@@ -80,26 +80,29 @@ A global Sessions object is available from the HotTub module and has several hel
 
     # A separate HotTub::Pool of Excon connections.
 
-    url2 = "http://someOtherServices.com"
-    HotTub.add(url2, { :size => 5 }) { Excon.new }
+    HotTub.add('yahoo', { :size => 5 }) { Excon.new("https://yahoo.com") }
 
-    # Lets add Redis too.
+    # Lets add Redis too. HotTub.add returns the pool created for that key so we
+    # can store that in an constant for easy access.
     # We don't want too many connections so we set our :max_size. Under load our pool
     # can grow to 30 connections. Once load dies down our pool can be reaped back down to 5
 
-    HotTub.add("redis", :size => 5, :max_size => 30) { Redis.new } 
+    REDIS = HotTub.add("redis", :size => 5, :max_size => 30) { Redis.new } 
       
+   
     # Now we can call any of our pools using the key we set any where in our code.
 
     HotTub.run(url) do |clnt|    
       puts clnt.head('/').code
     end
 
-    HotTub.run(url2) do |clnt|    
+    HotTub.run('yahoo') do |clnt|    
       puts clnt.get(:path => "/some_stuff", :query => {:foo => 'bar'}).body
     end
 
-    HotTub.run('redis') do |clnt|
+    # Since our REDIS contast was set to HotTub::Pool instance return from HotTub.add 
+    # we do not need the key when calling #run
+    REDIS.run do |clnt|
       clnt.set('hot', 'stuff')
     end
 
