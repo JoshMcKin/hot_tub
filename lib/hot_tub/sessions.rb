@@ -93,8 +93,8 @@ module HotTub
 
     alias :[] :fetch
 
-    def run(url, &run_block)
-      pool = fetch(url)
+    def run(key, &run_block)
+      pool = fetch(key)
       pool.run &run_block
     end
 
