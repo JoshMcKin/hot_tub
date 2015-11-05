@@ -2,7 +2,7 @@ module HotTub
   module KnownClients
     KNOWN_CLIENTS = {
       "Excon::Connection" => {
-        :close => lambda { |clnt| clnt.reset }
+        :close => :reset
       },
       "Net::HTTP" => {
         :close => lambda { |clnt|
