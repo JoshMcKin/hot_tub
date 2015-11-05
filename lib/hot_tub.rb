@@ -59,9 +59,13 @@ module HotTub
     GLOBAL_SESSIONS.shutdown!
   end
 
-  # Adds a new Pool to the global sessions
+  # Gets or sets a new Pool in the global sessions
+  def self.get_or_set(url,opts={}, &client_block)
+    GLOBAL_SESSIONS.get_or_set(url, opts, &client_block)
+  end
+  
   def self.add(url,opts={}, &client_block)
-    GLOBAL_SESSIONS.add(url, opts, &client_block)
+    self.get_or_set(url,opts, &client_block)
   end
 
   def self.run(url ,&run_block)

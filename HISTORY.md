@@ -3,6 +3,7 @@ HotTub Changelog
 
 Head
 =======
+- For Sessions, rename #add to #get_or_set for clarity, and alias with #add
 
 0.5.2
 =======

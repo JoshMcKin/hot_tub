@@ -57,7 +57,7 @@ module HotTub
 
     # Adds a new HotTub::Pool for the given key unless
     # one already exists.
-    def add(key, pool_options={}, &client_block)
+    def get_or_set(key, pool_options={}, &client_block)
       raise ArgumentError, 'a block that initializes a new client is required.' unless block_given?
       pool = nil
       return pool if pool = @_sessions[key]
@@ -69,6 +69,7 @@ module HotTub
       end
       pool
     end
+    alias :add :get_or_set
 
     # Deletes and shutdowns the pool if its found.
     def delete(key)

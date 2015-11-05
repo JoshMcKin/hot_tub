@@ -70,7 +70,7 @@ A global Sessions object is available from the HotTub module and has several hel
     # Once load dies down our pool will be reaped back down to 12 connections
 
     URL = "https://google.com"
-    pool = HotTub.add(URL, { :size => 12 }) do 
+    pool = HotTub.get_or_set(URL, { :size => 12 }) do 
       uri = URI.parse(URL)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
@@ -80,16 +80,15 @@ A global Sessions object is available from the HotTub module and has several hel
 
     # A separate HotTub::Pool of Excon connections.
 
-    HotTub.add('yahoo', { :size => 5 }) { Excon.new("https://yahoo.com") }
+    HotTub.get_or_set('yahoo', { :size => 5 }) { Excon.new("https://yahoo.com") }
 
     # Lets add Redis too. HotTub.add returns the pool created for that key so we
     # can store that in an constant for easy access.
     # We don't want too many connections so we set our :max_size. Under load our pool
     # can grow to 30 connections. Once load dies down our pool can be reaped back down to 5
 
-    REDIS = HotTub.add("redis", :size => 5, :max_size => 30) { Redis.new } 
+    REDIS = HotTub.get_or_set("redis", :size => 5, :max_size => 30) { Redis.new } 
       
-   
     # Now we can call any of our pools using the key we set any where in our code.
 
     HotTub.run(url) do |clnt|    

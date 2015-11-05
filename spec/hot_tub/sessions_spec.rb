@@ -15,7 +15,7 @@ describe HotTub::Sessions do
       context 'HotTub::Pool as client' do
         it "should add a new client for the key" do
           sessions = HotTub::Sessions.new
-          sessions.add(key) { MocClient.new } 
+          sessions.get_or_set(key) { MocClient.new } 
           sns = sessions.instance_variable_get(:@_sessions)
           expect(sns.size).to eql(1)
           sns.each_value {|v| expect(v).to be_a( HotTub::Pool)}
@@ -31,14 +31,14 @@ describe HotTub::Sessions do
 
     it "should start reaper after add" do
       expect(sessions.reaper).to be_nil
-      sessions.add("https://www.somewebsite.com") { MocClient.new } 
+      sessions.get_or_set("https://www.somewebsite.com") { MocClient.new } 
       expect(sessions.reaper).to be_a(Thread)
     end
 
     it "should disable pool based reaper" do
-      sessions.add("https://www.somewebsite.com") { MocClient.new } 
-      sessions.add("https://www.someOtherwebsite.com") { MocClient.new } 
-      sessions.add("https://www.someOtherwebsiteToo.com") { MocClient.new } 
+      sessions.get_or_set("https://www.somewebsite.com") { MocClient.new } 
+      sessions.get_or_set("https://www.someOtherwebsite.com") { MocClient.new } 
+      sessions.get_or_set("https://www.someOtherwebsiteToo.com") { MocClient.new } 
       session = sessions.instance_variable_get(:@_sessions)
       session.each_value {|v| expect(v.reaper).to be_nil}
     end
@@ -49,7 +49,7 @@ describe HotTub::Sessions do
     it "should pass run to pool" do
       url = HotTub::Server.url
       sessions = HotTub::Sessions.new
-      sessions.add(url) do
+      sessions.get_or_set(url) do
         uri = URI.parse(url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = false
@@ -68,8 +68,8 @@ describe HotTub::Sessions do
   describe '#clean!' do
     it "should clean all pools in sessions" do
       sessions = HotTub::Sessions.new
-      sessions.add('foo') { |url| MocClient.new(url) }
-      sessions.add('bar') { |url| MocClient.new(url) }
+      sessions.get_or_set('foo') { |url| MocClient.new(url) }
+      sessions.get_or_set('bar') { |url| MocClient.new(url) }
       sessions.clean!
       sessions.instance_variable_get(:@_sessions).each_pair do |k,v|
         v.instance_variable_get(:@_pool).each do |c|
@@ -82,8 +82,8 @@ describe HotTub::Sessions do
   describe '#drain!' do
     it "should drain all pools in sessions" do
       sessions = HotTub::Sessions.new
-      sessions.add('foo') { |url| MocClient.new(url) }
-      sessions.add('bar') { |url| MocClient.new(url) }
+      sessions.get_or_set('foo') { |url| MocClient.new(url) }
+      sessions.get_or_set('bar') { |url| MocClient.new(url) }
       sessions.drain!
       expect(sessions.instance_variable_get(:@_sessions)).to_not be_empty
     end
@@ -92,8 +92,8 @@ describe HotTub::Sessions do
   describe '#reap!' do
     it "should clean all pools in sessions" do
       sessions = HotTub::Sessions.new
-      sessions.add('foo') { |url| MocClient.new(url) }
-      sessions.add('bar') { |url| MocClient.new(url) }
+      sessions.get_or_set('foo') { |url| MocClient.new(url) }
+      sessions.get_or_set('bar') { |url| MocClient.new(url) }
       sessions.reap!
       sessions.instance_variable_get(:@_sessions).each_pair do |k,v|
         v.instance_variable_get(:@_pool).each do |c|
@@ -106,8 +106,8 @@ describe HotTub::Sessions do
   describe '#reset!' do
     it "should reset all pools in sessions" do
       sessions = HotTub::Sessions.new
-      sessions.add('foo') { |url| MocClient.new(url) }
-      sessions.add('bar') { |url| MocClient.new(url) }
+      sessions.get_or_set('foo') { |url| MocClient.new(url) }
+      sessions.get_or_set('bar') { |url| MocClient.new(url) }
       sessions.reset!
       sessions.instance_variable_get(:@_sessions).each_pair do |k,v|
         expect(v.instance_variable_get(:@_pool)).to be_empty
