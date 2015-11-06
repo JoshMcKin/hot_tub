@@ -148,7 +148,6 @@ describe HotTub::Pool do
 
     it "should kill reaper" do
       pool.shutdown!
-      sleep(0.01)
       expect(pool.instance_variable_get(:@reaper)).to be_nil
     end
 

@@ -40,7 +40,7 @@ describe HotTub::Sessions do
       sessions.get_or_set("https://www.someOtherwebsite.com") { MocClient.new } 
       sessions.get_or_set("https://www.someOtherwebsiteToo.com") { MocClient.new } 
       session = sessions.instance_variable_get(:@_sessions)
-      session.each_value {|v| expect(v.reaper).to be_nil}
+      session.each_value {|v| expect(v.reaper).to eql(false)}
     end
 
   end

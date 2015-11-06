@@ -31,10 +31,10 @@ module HotTub
     # Attempts to close the provided client, checking the options first for a close block
     # then checking the known clients
     def close_client(clnt)
-      @close_action = (@close_client || known_client_action(clnt,:close) || false) if @close_action.nil?
-      if @close_action
+      @close_client = (known_client_action(clnt,:close) || false) if @close_client.nil?
+      if @close_client
         begin
-          perform_action(clnt,@close_action)
+          perform_action(clnt,@close_client)
         rescue => e
           HotTub.logger.error "[HotTub] There was an error closing one of your #{self.class.name} clients: #{e}" if HotTub.logger
         end

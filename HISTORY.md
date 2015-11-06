@@ -4,6 +4,9 @@ HotTub Changelog
 Head
 =======
 - For Sessions, rename #add to #get_or_set for clarity, and alias with #add
+- Fix Ruby warnings
+- Prevent possible deadlock waiting for reaper to shutdown
+- No need to reset reaper
 
 0.5.2
 =======

@@ -1,1 +1,4 @@
 --color
+--warnings
+--format documentation
+--profile

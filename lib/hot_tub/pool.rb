@@ -4,7 +4,6 @@ module HotTub
     include HotTub::Reaper::Mixin
 
     attr_accessor :name
-    attr_reader :current_size, :last_activity
 
     # Thread-safe lazy connection pool
     #
@@ -92,14 +91,14 @@ module HotTub
     def initialize(opts={},&client_block)
       raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
       @name             = (opts[:name] || self.class.name)
-      @size             = (opts[:size] || 5)                # in seconds
-      @wait_timeout     = (opts[:wait_timeout] || 10)       # in seconds
-      @reap_timeout     = (opts[:reap_timeout] || 600)      # the interval to reap connections in seconds
-      @max_size         = (opts[:max_size] || 0)            # maximum size of pool when non-blocking, 0 means no limit
+      @size             = (opts[:size] || 5)            # in seconds
+      @wait_timeout     = (opts[:wait_timeout] || 10)   # in seconds
+      @reap_timeout     = (opts[:reap_timeout] || 600)  # the interval to reap connections in seconds
+      @max_size         = (opts[:max_size] || 0)        # maximum size of pool when non-blocking, 0 means no limit
 
-      @close_client     = opts[:close]                    # => lambda {|clnt| clnt.close} or :close
-      @clean_client     = opts[:clean]                    # => lambda {|clnt| clnt.clean} or :clean
-      @reap_client      = opts[:reap?]                    # => lambda {|clnt| clnt.reap?} or :reap? # should return boolean
+      @close_client     = opts[:close]                  # => lambda {|clnt| clnt.close} or :close
+      @clean_client     = opts[:clean]                  # => lambda {|clnt| clnt.clean} or :clean
+      @reap_client      = opts[:reap?]                  # => lambda {|clnt| clnt.reap?} or :reap? # should return boolean
       @client_block     = client_block
 
       @_pool            = []    # stores available clients
@@ -112,7 +111,7 @@ module HotTub
 
       @shutdown         = false
       @blocking_reap    = (opts[:reaper] == false && !opts[:sessions])
-      @reaper           = spawn_reaper unless (opts[:sessions] || (opts[:reaper] == false))
+      @reaper           = ((opts[:sessions] || (opts[:reaper] == false)) ? false : spawn_reaper)
 
       @never_block      = (@max_size == 0)
 
@@ -159,7 +158,7 @@ module HotTub
     end
     alias :close! :drain!
 
-    # Reset the pool and re-spawn reaper.
+    # Reset the pool.
     # or if shutdown allow threads to quickly finish their work
     # Clients from the previous pool will not return to pool.
     def reset!
@@ -168,10 +167,6 @@ module HotTub
         begin
           while clnt = @_pool.pop
             close_client(clnt)
-          end
-          if @reaper
-            kill_reaper
-            @reaper = spawn_reaper
           end
         ensure
           @_out.clear
@@ -186,12 +181,12 @@ module HotTub
     def shutdown!
       HotTub.logger.info "[HotTub] Shutting down pool #{@name}!" if HotTub.logger
       @shutdown = true
+      kill_reaper if @reaper
       @mutex.synchronize do
         begin
           while clnt = @_pool.pop
             close_client(clnt)
           end
-          kill_reaper if @reaper
         ensure
           @_out.clear
           @_pool.clear
@@ -254,7 +249,7 @@ module HotTub
           begin
             if !@shutdown && @_out.delete(clnt)
               @_pool << clnt
-            else 
+            else
               close_client(clnt)
               HotTub.logger.info "[HotTub] An orphaned client attempted to return to #{@name}." if HotTub.log_trace?
             end
@@ -286,7 +281,7 @@ module HotTub
         end
         break if clnt
       end
-      clean_client(clnt) if dirty && clnt 
+      clean_client(clnt) if dirty && clnt
       clnt
     end
 
@@ -306,7 +301,7 @@ module HotTub
       if (@never_block || (_total_current_size < @max_size))
         nc = yield
         HotTub.logger.info "[HotTub] Adding client: #{nc.class.name} to #{@name}." if HotTub.log_trace?
-        nc         
+        nc
       end
     end
 

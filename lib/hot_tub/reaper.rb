@@ -11,8 +11,8 @@ module HotTub
       th = Thread.new {
         loop do
           begin
-            obj.reap!
             break if obj.shutdown
+            obj.reap!
             sleep(obj.reap_timeout || 600)
           rescue Exception => e
             HotTub.logger.error "[HotTub] Reaper for #{obj.class.name} terminated with exception: #{e.message}" if HotTub.logger
@@ -50,7 +50,7 @@ module HotTub
         if @reaper
           @reaper.kill
           @reaper.join
-          @reaper = nil
+          @reaper = nil if @shutdown
         end
       end
 
