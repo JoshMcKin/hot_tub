@@ -3,6 +3,10 @@ HotTub Changelog
 
 Head
 =======
+- None yet
+
+0.5.3
+=======
 - For Sessions, rename #add to #get_or_set for clarity, and alias with #add
 - Fix Ruby warnings
 - Prevent possible deadlock waiting for reaper to shutdown
