@@ -110,12 +110,14 @@ module HotTub
       @cond             = ConditionVariable.new
 
       @shutdown         = false
-      @blocking_reap    = (opts[:reaper] == false && !opts[:sessions])
-      @reaper           = ((opts[:sessions] || (opts[:reaper] == false)) ? false : spawn_reaper)
+
+      @sessions_key     = opts[:sessions_key]
+      @blocking_reap    = (opts[:reaper] == false && !@sessions_key)
+      @reaper           = ((@sessions_key || (opts[:reaper] == false)) ? false : spawn_reaper)
 
       @never_block      = (@max_size == 0)
 
-      at_exit {shutdown!} unless opts[:sessions]
+      at_exit {shutdown!} unless @sessions_key
     end
 
     # Preform an operations with a client/connection.
@@ -297,9 +299,13 @@ module HotTub
     # Returns a new client if its allowed.
     # _add is volatile; and may cause threading issues
     # if called outside @mutex.synchronize {}
-    def _fetch_new
+    def _fetch_new(&client_block)
       if (@never_block || (_total_current_size < @max_size))
-        nc = yield
+        if client_block.arity == 0
+          nc = yield
+        else
+          nc = yield @sessions_key
+        end
         HotTub.logger.info "[HotTub] Adding client: #{nc.class.name} to #{@name}." if HotTub.log_trace?
         nc
       end

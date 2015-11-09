@@ -5,20 +5,36 @@ require 'time'
 describe HotTub::Sessions do
 
 
-  context 'initialized with a block' do
+  describe '#get_or_set' do
 
-    let(:key) { "https://www.somewebsite.com" }
+    context "with &default_client" do
+      let(:key) { "https://www.somewebsite.com" }
 
-    let(:sessions) { HotTub::Sessions.new }
+      let(:sessions) do
+        sns = HotTub::Sessions.new #{ MocClient.new }
+        sns.default_client = lambda { |url| MocClient.new(url) }
+        sns
+      end
 
-    describe '#sessions' do
-      context 'HotTub::Pool as client' do
-        it "should add a new client for the key" do
-          sessions = HotTub::Sessions.new
-          sessions.get_or_set(key) { MocClient.new } 
-          sns = sessions.instance_variable_get(:@_sessions)
-          expect(sns.size).to eql(1)
-          sns.each_value {|v| expect(v).to be_a( HotTub::Pool)}
+      it "should add a new pool for the key" do
+        pool = sessions.get_or_set(key)
+        expect(pool).to be_a(HotTub::Pool)
+        pool.run do |clnt|
+          expect(clnt).to be_a(MocClient)
+        end
+      end
+    end
+
+    context "with &client_block" do
+      let(:key) { "https://www.somewebsite.com" }
+
+      let(:sessions) { HotTub::Sessions.new }
+
+      it "should add a new client for the key" do
+        pool = sessions.get_or_set(key) { MocClient.new }
+        expect(pool).to be_a(HotTub::Pool)
+        pool.run do |clnt|
+          expect(clnt).to be_a(MocClient)
         end
       end
     end
@@ -31,14 +47,14 @@ describe HotTub::Sessions do
 
     it "should start reaper after add" do
       expect(sessions.reaper).to be_nil
-      sessions.get_or_set("https://www.somewebsite.com") { MocClient.new } 
+      sessions.get_or_set("https://www.somewebsite.com") { MocClient.new }
       expect(sessions.reaper).to be_a(Thread)
     end
 
     it "should disable pool based reaper" do
-      sessions.get_or_set("https://www.somewebsite.com") { MocClient.new } 
-      sessions.get_or_set("https://www.someOtherwebsite.com") { MocClient.new } 
-      sessions.get_or_set("https://www.someOtherwebsiteToo.com") { MocClient.new } 
+      sessions.get_or_set("https://www.somewebsite.com") { MocClient.new }
+      sessions.get_or_set("https://www.someOtherwebsite.com") { MocClient.new }
+      sessions.get_or_set("https://www.someOtherwebsiteToo.com") { MocClient.new }
       session = sessions.instance_variable_get(:@_sessions)
       session.each_value {|v| expect(v.reaper).to eql(false)}
     end
