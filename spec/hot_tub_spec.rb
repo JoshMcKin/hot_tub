@@ -4,7 +4,7 @@ describe HotTub do
   context "helpers" do
     describe '#new' do
       it "should return a HotTub::Pool" do
-        expect(HotTub.new { |url| MocClient.new(url) }).to be_a(HotTub::Pool)
+        expect(HotTub::Pool.new { |url| MocClient.new(url) }).to be_a(HotTub::Pool)
       end
     end
 

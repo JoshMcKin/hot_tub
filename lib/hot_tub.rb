@@ -74,6 +74,7 @@ module HotTub
   end
 
   def self.new(opts={}, &client_block)
+    warn "[DEPRECATION] `HotTub.new` is deprecated.  Please use `HotTub::Pool.new` instead."
     Pool.new(opts,&client_block)
   end
 end

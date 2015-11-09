@@ -4,7 +4,7 @@ describe HotTub do
 
   context "blocking (size equals max_size)" do
     let(:pool) do
-      HotTub.new(:size => 4, :max_size => 4) {
+      HotTub::Pool.new(:size => 4, :max_size => 4) {
         Excon.new(HotTub::Server.url, :thread_safe_sockets => false)
       }
     end
@@ -33,7 +33,7 @@ describe HotTub do
 
   context "with larger max" do
     let(:pool) do
-      HotTub.new(:size => 4, :max_size => 8) {
+      HotTub::Pool.new(:size => 4, :max_size => 8) {
         Excon.new(HotTub::Server.url, :thread_safe_sockets => false)
       }
     end
@@ -64,7 +64,7 @@ describe HotTub do
 
   context "sized without max" do
     let(:pool) do
-      HotTub.new(:size => 4) {
+      HotTub::Pool.new(:size => 4) {
         Excon.new(HotTub::Server.url, :thread_safe_sockets => false)
       }
     end
@@ -93,7 +93,7 @@ describe HotTub do
 
   context "shutdown with slow client" do
     let(:pool) do
-      HotTub.new(:size => 1) {
+      HotTub::Pool.new(:size => 1) {
         Excon.new(HotTub::Server.slow_url, :thread_safe_sockets => false, :read_timeout => 2)
       }
     end

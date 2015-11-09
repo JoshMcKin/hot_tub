@@ -3,7 +3,7 @@ require 'spec_helper'
 describe HotTub do
   context "blocking (size equals max_size)" do
     let(:pool) do
-      HotTub.new(:size => 4, :max_size => 4) {
+      HotTub::Pool.new(:size => 4, :max_size => 4) {
         uri = URI.parse(HotTub::Server.url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = false
@@ -36,7 +36,7 @@ describe HotTub do
 
   context "with larger max" do
     let(:pool) do
-      HotTub.new(:size => 4, :max_size => 8) {
+      HotTub::Pool.new(:size => 4, :max_size => 8) {
         uri = URI.parse(HotTub::Server.url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = false
@@ -64,7 +64,7 @@ describe HotTub do
 
   context "sized without max" do
     let(:pool) do
-      HotTub.new(:size => 4) {
+      HotTub::Pool.new(:size => 4) {
         uri = URI.parse(HotTub::Server.url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = false
