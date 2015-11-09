@@ -3,7 +3,7 @@ HotTub Changelog
 
 Head
 =======
-- None yet
+- Allow setting a default client for HotTub::Sessions
 
 0.5.3
 =======
