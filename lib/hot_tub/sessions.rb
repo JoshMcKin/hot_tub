@@ -3,54 +3,76 @@ module HotTub
   class Sessions
     include HotTub::KnownClients
     include HotTub::Reaper::Mixin
-    attr_accessor :name
+    attr_accessor :name,
+      :default_client
 
     # HotTub::Sessions simplifies managing multiple Pools in a single object
     # and using a single Reaper.
     #
     # == Example:
     #
-    #   url  = "http://somewebservice.com"
-    #   url2 = "http://somewebservice2.com"
-    #
-    #   sessions = HotTub::Sessions
-    #   sessions.add(url,{:size => 12}) {
+    #   sessions = HotTub::Sessions(:size => 10) do |url|
     #     uri = URI.parse(url)
     #     http = Net::HTTP.new(uri.host, uri.port)
     #     http.use_ssl = false
     #     http.start
     #     http
-    #    }
-    #   sessions.add(url2,{:size => 5}) {
-    #     Excon.new(url2)
-    #    }
+    #   end
     #
-    #   sessions.run(url) do |conn|
+    #   # Every time we pass a url that lacks a entry in our
+    #   # sessions, a new HotTub::Pool is added for that url
+    #   # using the &default_client.
+    #   #
+    #   sessions.run("https://www.google.com"") do |conn|
     #     p conn.head('/').code
     #   end
     #
-    #   sessions.run(url2) do |conn|
+    #   sessions.run("https://www.yahoo.com"") do |conn|
+    #     p conn.head('/').code
+    #   end
+    #
+    #   excon_url = "http://somewebservice2.com"
+    #
+    #   sessions.add(excon_url,{:size => 5}) {
+    #     Excon.new(excon_url, :thread_safe_socket => false)
+    #    }
+    #
+    #   # Uses Excon
+    #   sessions.run(excon_url) do |conn|
     #     p conn.head('/').code
     #   end
     #
     # === OPTIONS
+    #
+    #   &default_client
+    #     An optional block for a default client for your pools. If your block accepts a
+    #     parameters, they session key is passed to the block. Your default client
+    #     block will be overridden if you pass a client block to get_or_set
+    #
+    #   [:pool_options]
+    #     Default options for your HotTub::Pools. If you pass options to #get_or_set those options
+    #     override :pool_options.
+    #
     #   [:name]
     #     A string representing the name of your sessions used for logging.
     #
     #   [:reaper]
-    #     If set to false prevents a HotTub::Reaper from initializing.
+    #     If set to false prevents a HotTub::Reaper from initializing for these sessions.
     #
     #   [:reap_timeout]
     #     Default is 600 seconds. An integer that represents the timeout for reaping the pool in seconds.
     #
-    def initialize(opts={})
-      @name             = (opts[:name] || self.class.name)
-      @reaper           = opts[:reaper]
-      @reap_timeout     = (opts[:reap_timeout] || 600)
+    def initialize(opts={}, &default_client)
+      @name                 = (opts[:name] || self.class.name)
+      @reaper               = opts[:reaper]
+      @reap_timeout         = (opts[:reap_timeout] || 600)
+      @default_client       = default_client
+      @pool_options         = (opts[:pool_options] || {})
 
-      @_sessions        = {}
-      @mutex            = Mutex.new
-      @shutdown         = false
+      @_sessions            = {}
+      @_sessions.taint
+      @mutex                = Mutex.new
+      @shutdown             = false
 
       at_exit {shutdown!}
     end
@@ -58,14 +80,15 @@ module HotTub
     # Adds a new HotTub::Pool for the given key unless
     # one already exists.
     def get_or_set(key, pool_options={}, &client_block)
-      raise ArgumentError, 'a block that initializes a new client is required.' unless block_given?
       pool = nil
       return pool if pool = @_sessions[key]
-      pool_options[:sessions] = true
-      pool_options[:name] = "#{@name} - #{key}"
+      clnt_blk = (client_block || @default_client)
+      op = @pool_options.merge(pool_options)
+      op[:sessions_key] = key
+      op[:name] = "#{@name} - #{key}"
       @mutex.synchronize do
         @reaper ||= spawn_reaper if @reaper.nil?
-        pool = @_sessions[key] ||= HotTub::Pool.new(pool_options, &client_block) unless @shutdown
+        pool = @_sessions[key] ||= HotTub::Pool.new(op, &clnt_blk) unless @shutdown
       end
       pool
     end
@@ -87,8 +110,9 @@ module HotTub
     end
 
     def fetch(key)
-      pool = @_sessions[key]
-      raise MissingSession, "A session could not be found for #{key.inspect} #{@name}" unless pool
+      unless pool = get_or_set(key, &@default_client)
+        raise MissingSession, "A session could not be found for #{key.inspect} #{@name}"
+      end
       pool
     end
 

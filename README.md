@@ -64,23 +64,38 @@ A global Sessions object is available from the HotTub module and has several hel
     require 'excon'
     require 'redis'
 
-    # Add a HotTub::Pool of Net::HTTP connections to our sessions with a size of 12.
-    # We are using the url as the key but could use anything.
-    # we are not setting :max_size so our connections will grow to match our currency.
-    # Once load dies down our pool will be reaped back down to 12 connections
+    # Lets configure HotTub global sessions to use NetHTTP as our default client
 
-    URL = "https://google.com"
-    pool = HotTub.get_or_set(URL, { :size => 12 }) do 
-      uri = URI.parse(URL)
+    HotTub.default_client = lambda { |url| 
+      uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
       http.start
       http 
+    }
+
+    # Add a HotTub::Pool for "https://www.google.com" and use it.
+    HotTub.run("https://www.google.com") do |clnt|    
+      puts clnt.head('/').code
     end
 
-    # A separate HotTub::Pool of Excon connections.
+    # Re-use our "https://www.google.com" HotTub::Pool
+    HotTub.run("https://www.google.com") do |clnt|    
+      puts clnt.head('/').code
+    end
 
-    HotTub.get_or_set('yahoo', { :size => 5 }) { Excon.new("https://yahoo.com") }
+    # Add another HotTub::Pool for "https://www.yahoo.com" and use it
+    HotTub.run("https://www.yahoo.com") do |clnt|    
+      puts clnt.head('/').code
+    end
+
+    # We can setup HotTub::Pools with unique settings.
+    # Lets add another HotTub::Pool of Excon clients with a pool size of 12.
+    # We are using the url as the key but could use anything.
+    # we are not setting :max_size so our connections will grow to match our currency.
+    # Once load dies down our pool will be reaped back down to 12 connections
+
+    HotTub.get_or_set('excon_yahoo', { :size => 12, :thread_safe_sockets => false }) { Excon.new("https://yahoo.com") }
 
     # Lets add Redis too. HotTub.add returns the pool created for that key so we
     # can store that in an constant for easy access.
@@ -91,18 +106,19 @@ A global Sessions object is available from the HotTub module and has several hel
       
     # Now we can call any of our pools using the key we set any where in our code.
 
-    HotTub.run(url) do |clnt|    
-      puts clnt.head('/').code
-    end
-
-    HotTub.run('yahoo') do |clnt|    
+    HotTub.run('excon_yahoo') do |clnt|    
       puts clnt.get(:path => "/some_stuff", :query => {:foo => 'bar'}).body
     end
 
-    # Since our REDIS contast was set to HotTub::Pool instance return from HotTub.add 
+    # Since our REDIS constant was set to HotTub::Pool instance return from HotTub.add 
     # we do not need the key when calling #run
     REDIS.run do |clnt|
       clnt.set('hot', 'stuff')
+    end
+
+    # Re-use "https://www.google.com" we created earlier
+    HotTub.run("https://www.google.com") do |clnt|    
+      puts clnt.head('/').code
     end
 
 
@@ -126,13 +142,11 @@ a different library you would like to use, HotTub can be configured to support y
 using `:close`, `:clean`, and `:reap?` options in a pools settings.
 
 `:close` is used to define how a connections should be closed at shutdown and upon reaping.
-reaped.
 
 `:clean` is called on each existing connection as its pulled from the pool.
 
 `:reap?` is used to determine if a connection in the pool is ready for reaping.
 
-EX:
     pool_options = {
       :size     => 5
       :max_size => 10
