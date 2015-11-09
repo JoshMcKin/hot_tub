@@ -67,7 +67,7 @@ A global Sessions object is available from the HotTub module and has several hel
     # Lets configure HotTub global sessions to use NetHTTP as our default client
 
     HotTub.default_client = lambda { |url| 
-      uri = URI.parse(URL)
+      uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = false
       http.start
@@ -90,7 +90,7 @@ A global Sessions object is available from the HotTub module and has several hel
     end
 
     # We can setup HotTub::Pools with unique settings.
-    # Here add another HotTub::Pool of Excon clients with a pool size of 12.
+    # Lets add another HotTub::Pool of Excon clients with a pool size of 12.
     # We are using the url as the key but could use anything.
     # we are not setting :max_size so our connections will grow to match our currency.
     # Once load dies down our pool will be reaped back down to 12 connections
@@ -116,7 +116,7 @@ A global Sessions object is available from the HotTub module and has several hel
       clnt.set('hot', 'stuff')
     end
 
-    # Re-use our "https://www.google.com" HotTub::Pool we created earlier
+    # Re-use "https://www.google.com" we created earlier
     HotTub.run("https://www.google.com") do |clnt|    
       puts clnt.head('/').code
     end
@@ -148,7 +148,6 @@ reaped.
 
 `:reap?` is used to determine if a connection in the pool is ready for reaping.
 
-EX:
     pool_options = {
       :size     => 5
       :max_size => 10
