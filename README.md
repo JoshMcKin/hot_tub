@@ -142,7 +142,6 @@ a different library you would like to use, HotTub can be configured to support y
 using `:close`, `:clean`, and `:reap?` options in a pools settings.
 
 `:close` is used to define how a connections should be closed at shutdown and upon reaping.
-reaped.
 
 `:clean` is called on each existing connection as its pulled from the pool.
 
