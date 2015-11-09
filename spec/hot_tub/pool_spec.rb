@@ -210,7 +210,6 @@ describe HotTub::Pool do
   context 'thread safety' do
     it "should grow" do
       pool = HotTub::Pool.new({:size => 4}) { MocClient.new }
-      failed = false
       threads = []
       20.times.each do
         threads << Thread.new do
