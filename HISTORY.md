@@ -4,6 +4,7 @@ HotTub Changelog
 Head
 =======
 - Allow setting a default client for HotTub::Sessions
+- Deprecate HotTub.new
 
 0.5.3
 =======
