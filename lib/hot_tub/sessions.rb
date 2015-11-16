@@ -102,7 +102,7 @@ module HotTub
         pool = @_sessions.delete(key)
       end
       if pool
-        pool.reset!
+        pool.shutdown!
         deleted = true
         HotTub.logger.info "[HotTub] #{key} was deleted from #{@name}." if HotTub.logger
       end
