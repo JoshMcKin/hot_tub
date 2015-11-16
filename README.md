@@ -1,28 +1,6 @@
 # HotTub [![Build Status](https://travis-ci.org/JoshMcKin/hot_tub.png?branch=master)](https://travis-ci.org/JoshMcKin/hot_tub) [![Coverage Status](https://coveralls.io/repos/JoshMcKin/hot_tub/badge.png?branch=master)](https://coveralls.io/r/JoshMcKin/hot_tub)
 
-Flexible, thread-safe, connection pooling for Ruby. Configurable for any client you desire. Built in reaper th built in support for Net::HTTP and [Excon](https://github.com/excon/excon).
-
-## Features
-
-### HotTub::Pool
-
-* Thread safe
-* Lazy, pool starts off at 0 and grows as necessary.
-* Non-Blocking, can be configured to always return a connection if your pool runs out under load. Overflow connections are returned to the pool for reuse. Once load dies, the pool is reaped down to size.
-* Support for cleaning dirty resources, no one likes a dirty `HotTub`
-* Support for closing resources on shutdown
-* Support for process forking
-
-
-### HotTub::Sessions
-
-A synchronized hash where keys are mapped to a HotTub::Pools that are managed by a single HotTub::Reaper.
-
-
-### HotTub::Reaper
-
-A separate thread thats manages your pool(s). All HotTub::Pools managed by HotTub::Sessions share a single reaper. One-off HotTub::Pools have their own reaper. The reaper periodically checks pool(s) based on the `:reap_timeout` set for the pool or session. Over-flow connections or connections deemed reap-able ready are pulled from the pool and closed.
-
+Flexible, thread-safe, connection pooling for Ruby. Configurable for any client you desire with built in support for Net::HTTP and [Excon](https://github.com/excon/excon).
 
 ### Requirements
 
@@ -60,9 +38,6 @@ HotTub::Sessions are used to manage multiple pools with a single object and usin
 A global Sessions object is available from the HotTub module and has several helper methods.
   
     require 'hot_tub'
-    require 'net/http'
-    require 'excon'
-    require 'redis'
 
     # Lets configure HotTub global sessions to use NetHTTP as our default client
 
@@ -76,38 +51,39 @@ A global Sessions object is available from the HotTub module and has several hel
 
     # Add a HotTub::Pool for "https://www.google.com" and use it.
     HotTub.run("https://www.google.com") do |clnt|    
-      puts clnt.head('/').code
+      puts clnt.get('/').code
     end
 
-    # Re-use our "https://www.google.com" HotTub::Pool
+    # Re-uses the previously defined pool
     HotTub.run("https://www.google.com") do |clnt|    
-      puts clnt.head('/').code
+      puts clnt.get('/').code
     end
 
     # Add another HotTub::Pool for "https://www.yahoo.com" and use it
     HotTub.run("https://www.yahoo.com") do |clnt|    
-      puts clnt.head('/').code
+      puts clnt.get('/').code
     end
 
-    # We can setup HotTub::Pools with unique settings.
+    # We can add more HotTub::Pools with unique settings.
     # Lets add another HotTub::Pool of Excon clients with a pool size of 12.
-    # We are using the url as the key but could use anything.
-    # we are not setting :max_size so our connections will grow to match our currency.
+    # We are not setting :max_size so our connections will grow to match our currency.
     # Once load dies down our pool will be reaped back down to 12 connections
 
-    HotTub.get_or_set('excon_yahoo', { :size => 12, :thread_safe_sockets => false }) { Excon.new("https://yahoo.com") }
+    HotTub.add('excon_yahoo', { :size => 12} ) do
+     Excon.new("https://yahoo.com", :thread_safe_sockets => false )
+    end
 
     # Lets add Redis too. HotTub.add returns the pool created for that key so we
     # can store that in an constant for easy access.
     # We don't want too many connections so we set our :max_size. Under load our pool
     # can grow to 30 connections. Once load dies down our pool can be reaped back down to 5
 
-    REDIS = HotTub.get_or_set("redis", :size => 5, :max_size => 30) { Redis.new } 
+    REDIS = HotTub.add("redis", :size => 5, :max_size => 30) { Redis.new } 
       
-    # Now we can call any of our pools using the key we set any where in our code.
+    # Now we can call any of our pools using the key we set.
 
     HotTub.run('excon_yahoo') do |clnt|    
-      puts clnt.get(:path => "/some_stuff", :query => {:foo => 'bar'}).body
+      puts clnt.get.status
     end
 
     # Since our REDIS constant was set to HotTub::Pool instance return from HotTub.add 
@@ -118,7 +94,7 @@ A global Sessions object is available from the HotTub module and has several hel
 
     # Re-use "https://www.google.com" we created earlier
     HotTub.run("https://www.google.com") do |clnt|    
-      puts clnt.head('/').code
+      puts clnt.get('/').code
     end
 
 
@@ -139,7 +115,8 @@ A global Sessions object is available from the HotTub module and has several hel
 
 HotTub has built in support for closing NetHTTP and Excon. If you need more control or have 
 a different library you would like to use, HotTub can be configured to support your needs 
-using `:close`, `:clean`, and `:reap?` options in a pools settings.
+using `:close`, `:clean`, and `:reap?` options in a pools settings, and each option can accept
+a lambda that accepts the client as an argument or symbol representing a method to call on the client.
 
 `:close` is used to define how a connections should be closed at shutdown and upon reaping.
 
@@ -150,9 +127,9 @@ using `:close`, `:clean`, and `:reap?` options in a pools settings.
     pool_options = {
       :size     => 5
       :max_size => 10
-      :close    => lambda { |clnt| clnt.close_it }, # could also use :close_id symbol instead of a lambda
+      :close    => :close
       :clean    => lambda { |clnt| clnt.reconnect if clnt.dirty? },
-      :reap?    => lambda { |clnt| clnt.stail? }
+      :reap?    => :stale? # returns truthy if we want to reap
     }
 
     HotTub.add('offBrand', pool_options) { MyCoolClient.new }

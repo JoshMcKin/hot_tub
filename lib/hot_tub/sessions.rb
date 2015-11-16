@@ -14,7 +14,6 @@ module HotTub
     #   sessions = HotTub::Sessions(:size => 10) do |url|
     #     uri = URI.parse(url)
     #     http = Net::HTTP.new(uri.host, uri.port)
-    #     http.use_ssl = false
     #     http.start
     #     http
     #   end
@@ -24,11 +23,11 @@ module HotTub
     #   # using the &default_client.
     #   #
     #   sessions.run("https://www.google.com"") do |conn|
-    #     p conn.head('/').code
+    #     p conn.get('/').code
     #   end
     #
     #   sessions.run("https://www.yahoo.com"") do |conn|
-    #     p conn.head('/').code
+    #     p conn.get('/').code
     #   end
     #
     #   excon_url = "http://somewebservice2.com"
@@ -39,7 +38,7 @@ module HotTub
     #
     #   # Uses Excon
     #   sessions.run(excon_url) do |conn|
-    #     p conn.head('/').code
+    #     p conn.head.code
     #   end
     #
     # === OPTIONS

@@ -11,7 +11,6 @@ module HotTub
     #     pool = HotTub::Pool.new(:size => 10) {
     #       uri = URI.parse("http://somewebservice.com")
     #       http = Net::HTTP.new(uri.host, uri.port)
-    #       http.use_ssl = false
     #       http.start
     #       http
     #     }
@@ -44,7 +43,7 @@ module HotTub
     #     begin
     #       pool.run { |clnt| s clnt.head('/').code }
     #     rescue HotTub::Pool::Timeout => e
-    #       puts "Waited too long for a client: {e}"
+    #       puts "Waited too long for a client: #{e}"
     #     end
     #
     #
