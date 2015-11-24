@@ -1,5 +1,5 @@
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
-require 'benchmark'
+require 'benchmark/ips'
 
 puts `ruby -v`
 
@@ -29,68 +29,72 @@ class BlockTest
 end
 
 
-n = 1_000_000
-Benchmark.bmbm do |x|
+Benchmark.ips do |x|
   x.report("block yield") do
-    n.times do
-      BlockTest.block_yield { "foo" }
-    end
+    BlockTest.block_yield { "foo" }
   end
   x.report("block call") do
-    n.times do
-      BlockTest.block_call { "foo" }
-    end
+    BlockTest.block_call { "foo" }
   end
   x.report("block to yield") do
-    n.times do
-      BlockTest.block_to_yield { "foo" }
-    end
+    BlockTest.block_to_yield { "foo" }
   end
   x.report("block to call") do
-    n.times do
-      BlockTest.block_to_call { "foo" }
-    end
+    BlockTest.block_to_call { "foo" }
   end
+  x.compare!
 end
 
 # ruby 2.2.3p173 (2015-08-18 revision 51636) [x86_64-darwin14]
-# Rehearsal --------------------------------------------------
-# block yield      0.170000   0.000000   0.170000 (  0.169354)
-# block call       0.670000   0.010000   0.680000 (  0.670445)
-# block to yield   0.650000   0.000000   0.650000 (  0.645591)
-# block to call    0.750000   0.000000   0.750000 (  0.753102)
-# ----------------------------------------- total: 2.250000sec
+# Calculating -------------------------------------
+#          block yield   108.249k i/100ms
+#           block call    64.448k i/100ms
+#       block to yield    64.881k i/100ms
+#        block to call    60.643k i/100ms
+# -------------------------------------------------
+#          block yield      4.655M (± 3.2%) i/s -     23.274M
+#           block call      1.262M (± 3.2%) i/s -      6.316M
+#       block to yield      1.370M (± 3.8%) i/s -      6.877M
+#        block to call      1.174M (± 2.1%) i/s -      5.882M
 
-#                      user     system      total        real
-# block yield      0.170000   0.000000   0.170000 (  0.166196)
-# block call       0.670000   0.000000   0.670000 (  0.663034)
-# block to yield   0.640000   0.000000   0.640000 (  0.644746)
-# block to call    0.740000   0.000000   0.740000 (  0.747084)
+# Comparison:
+#          block yield:  4655424.9 i/s
+#       block to yield:  1369839.7 i/s - 3.40x slower
+#           block call:  1261742.0 i/s - 3.69x slower
+#        block to call:  1173741.8 i/s - 3.97x slower
 
 # rubinius 2.5.8 (2.1.0 bef51ae3 2015-07-14 3.5.1 JI) [x86_64-darwin14.4.0]
-# Rehearsal --------------------------------------------------
-# block yield      0.153971   0.007521   0.161492 (  0.123423)
-# block call       0.482452   0.001687   0.484139 (  0.404527)
-# block to yield   0.421112   0.001725   0.422837 (  0.317573)
-# block to call    0.515777   0.001130   0.516907 (  0.454804)
-# ----------------------------------------- total: 1.585375sec
+# Calculating -------------------------------------
+#          block yield   148.685k i/100ms
+#           block call   140.704k i/100ms
+#       block to yield   163.061k i/100ms
+#        block to call   126.667k i/100ms
+# -------------------------------------------------
+#          block yield      4.162M (± 3.0%) i/s -     20.816M
+#           block call      1.886M (± 2.8%) i/s -      9.427M
+#       block to yield      2.358M (± 2.1%) i/s -     11.903M
+#        block to call      1.678M (± 1.8%) i/s -      8.487M
 
-#                      user     system      total        real
-# block yield      0.054358   0.000111   0.054469 (  0.054250)
-# block call       0.368271   0.000868   0.369139 (  0.368516)
-# block to yield   0.281076   0.000553   0.281629 (  0.281446)
-# block to call    0.428372   0.000901   0.429273 (  0.428916)
+# Comparison:
+#          block yield:  4162250.5 i/s
+#       block to yield:  2357928.4 i/s - 1.77x slower
+#           block call:  1885832.8 i/s - 2.21x slower
+#        block to call:  1678439.6 i/s - 2.48x slower
 
 # jruby 9.0.3.0 (2.2.2) 2015-10-21 633c9aa Java HotSpot(TM) 64-Bit Server VM 23.5-b02 on 1.7.0_09-b05 +jit [darwin-x86_64]
-# Rehearsal --------------------------------------------------
-# block yield      0.400000   0.010000   0.410000 (  0.265343)
-# block call       0.370000   0.000000   0.370000 (  0.300598)
-# block to yield   0.280000   0.010000   0.290000 (  0.238879)
-# block to call    0.400000   0.000000   0.400000 (  0.288711)
-# ----------------------------------------- total: 1.470000sec
+# Calculating -------------------------------------
+#          block yield   109.774k i/100ms
+#           block call   114.963k i/100ms
+#       block to yield   125.225k i/100ms
+#        block to call   109.991k i/100ms
+# -------------------------------------------------
+#          block yield      4.998M (± 6.1%) i/s -     24.919M
+#           block call      3.980M (± 5.4%) i/s -     19.889M
+#       block to yield      4.532M (± 7.4%) i/s -     22.541M
+#        block to call      3.771M (± 4.7%) i/s -     18.808M
 
-#                      user     system      total        real
-# block yield      0.190000   0.000000   0.190000 (  0.185705)
-# block call       0.230000   0.000000   0.230000 (  0.227818)
-# block to yield   0.200000   0.000000   0.200000 (  0.206645)
-# block to call    0.250000   0.000000   0.250000 (  0.244579)
+# Comparison:
+#          block yield:  4997696.4 i/s
+#       block to yield:  4531931.2 i/s - 1.10x slower
+#           block call:  3979846.8 i/s - 1.26x slower
+#        block to call:  3771261.6 i/s - 1.33x slower

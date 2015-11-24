@@ -44,7 +44,6 @@ A global Sessions object is available from the HotTub module and has several hel
     HotTub.default_client = lambda { |url| 
       uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = false
       http.start
       http 
     }
