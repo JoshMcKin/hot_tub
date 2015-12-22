@@ -106,7 +106,6 @@ describe HotTub do
             connection.get(:path => uri.path).status
           end
         end
-        sleep(0.01)
         pool.shutdown!
         th.join
       rescue => e

@@ -213,10 +213,9 @@ describe HotTub::Pool do
       threads = []
       20.times.each do
         threads << Thread.new do
-          pool.run{|connection| connection.get }
+          pool.run { |connection| connection.get }
         end
       end
-      sleep(0.01)
       threads.each do |t|
         t.join
       end

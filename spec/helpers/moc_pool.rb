@@ -22,4 +22,12 @@ class MocReaperPool < MocPool
     @reap_timeout = 1
     @reaper = HotTub::Reaper.spawn(self)
   end
+
+  def reap!
+    if @lets_reap
+      @lets_reap.call
+      @reaped = true
+      @lets_reap = nil
+    end
+  end
 end
