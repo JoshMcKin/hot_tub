@@ -17,17 +17,28 @@ class MocPool < MocMixinPool
 end
 
 class MocReaperPool < MocPool
+  attr_accessor :mx, :cv, :reaped
   def initialize
     super
     @reap_timeout = 0.01
+    
+    @mx  = Mutex.new
+    @cv  =  ConditionVariable.new
+    @reaped = false
+
     @reaper = HotTub::Reaper.spawn(self)
   end
 
+  def wait_for_reap
+    @mx.synchronize do
+      @cv.wait(@mx)
+    end
+  end
+
   def reap!
-    if @lets_reap
-      @lets_reap.call
+    @mx.synchronize do
       @reaped = true
-      @lets_reap = nil
+      @cv.signal
     end
   end
 end

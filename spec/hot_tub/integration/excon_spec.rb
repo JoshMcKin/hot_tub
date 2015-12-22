@@ -1,5 +1,4 @@
 require 'spec_helper'
-
 describe HotTub do
 
   context "blocking (size equals max_size)" do
@@ -52,7 +51,7 @@ describe HotTub do
 
     it "should reap" do
       pool.reap!
-      expect(pool.current_size).to be <= 4 
+      expect(pool.current_size).to be <= 4
     end
 
     it "should work" do
@@ -90,33 +89,6 @@ describe HotTub do
       expect(results.uniq).to eql([200])
     end
   end
-
-  context "shutdown with slow client" do
-    let(:pool) do
-      HotTub::Pool.new(:size => 1) {
-        Excon.new(HotTub::Server.slow_url, :thread_safe_sockets => false, :read_timeout => 2)
-      }
-    end
-
-    it "should work" do
-      begin
-        th = Thread.new do
-          uri = URI.parse(HotTub::Server.slow_url)
-          pool.run do |connection|
-            connection.get(:path => uri.path).status
-          end
-        end
-        pool.shutdown!
-        th.join
-      rescue => e
-        puts e.message
-      end
-
-      expect(pool.shutdown).to eql(true)
-      expect(pool.current_size).to eql(0)
-    end
-  end
-
 end
 
 def excon_thread_work(pool,thread_count=0, threads=[])
