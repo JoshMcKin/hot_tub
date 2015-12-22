@@ -48,7 +48,7 @@ describe HotTub::Sessions do
     it "should start reaper after add" do
       expect(sessions.reaper).to be_nil
       sessions.get_or_set("https://www.somewebsite.com") { MocClient.new }
-      expect(sessions.reaper).to be_a(Thread)
+      expect(sessions.reaper).to be_a(HotTub::Reaper)
     end
 
     it "should disable pool based reaper" do

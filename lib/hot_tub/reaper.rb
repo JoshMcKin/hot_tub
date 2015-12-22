@@ -1,5 +1,10 @@
 module HotTub
   class Reaper
+    attr_reader :thread
+
+    def self.spawn(obj)
+      self.new(obj)
+    end
 
     # Creates a new Reaper thread for work.
     # Expects an object that responses to: :reap!
@@ -7,8 +12,8 @@ module HotTub
     # Threads swallow exceptions until they are joined,
     # so we rescue, log, and kill the reaper when an exception occurs
     # https://bugs.ruby-lang.org/issues/6647
-    def self.spawn(obj)
-      th = Thread.new {
+    def initialize(obj)
+      @thread = Thread.new {
         loop do
           begin
             break if obj.shutdown
@@ -21,21 +26,38 @@ module HotTub
           end
         end
       }
-      th[:name] = "HotTub::Reaper"
-      th.abort_on_exception = true
-      th
+      @thread[:name] = "HotTub::Reaper"
+      @thread.abort_on_exception = true
+      @thread
+    end
+
+    def status
+      @thread.status
+    end
+
+    def wakeup
+      @thread.wakeup
+    end
+
+    def shutdown
+      @thread.kill
+      @thread.join
+    end
+
+    def alive?
+      @thread.alive?
     end
 
     # Mixin to dry up Reaper usage
     module Mixin
       attr_reader :reap_timeout, :shutdown, :reaper
 
-      # Setting reaper kills the current reaper. 
+      # Setting reaper kills the current reaper.
       # If the values is truthy a new HotTub::Reaper
       # is created.
       def reaper=reaper
         kill_reaper
-        if reaper 
+        if reaper
           @reaper = HotTub::Reaper.new(self)
         else
           @reaper = false
@@ -48,8 +70,7 @@ module HotTub
 
       def kill_reaper
         if @reaper
-          @reaper.kill
-          @reaper.join
+          @reaper.shutdown
           @reaper = nil if @shutdown
         end
       end

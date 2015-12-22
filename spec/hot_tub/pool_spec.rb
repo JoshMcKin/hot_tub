@@ -21,7 +21,7 @@ describe HotTub::Pool do
     end
 
     it "should have a HotTub::Reaper" do
-      expect(pool.reaper).to be_a(Thread)
+      expect(pool.reaper).to be_a(HotTub::Reaper)
     end
   end
 
