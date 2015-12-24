@@ -3,6 +3,10 @@ HotTub Changelog
 
 Head
 =======
+- None yet.
+
+1.0.0
+=======
 - Allow setting a default client for HotTub::Sessions
 - Deprecate HotTub.new
 - Call pool.shutdown! when deleting a session
