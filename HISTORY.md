@@ -5,7 +5,8 @@ Head
 =======
 - Allow setting a default client for HotTub::Sessions
 - Deprecate HotTub.new
-- call pool.shutdown! when deleting a session
+- Call pool.shutdown! when deleting a session
+- Add Sessions.stage to lazy load pools
 
 0.5.3
 =======

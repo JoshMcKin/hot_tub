@@ -30,14 +30,30 @@ module HotTub
     #     p conn.get('/').code
     #   end
     #
+    #   # Lazy load a non-default connection
+    #
     #   excon_url = "http://somewebservice2.com"
     #
-    #   sessions.add(excon_url,{:size => 5}) {
+    #   sessions.stage(excon_url,{:size => 5}) {
     #     Excon.new(excon_url, :thread_safe_socket => false)
     #    }
     #
-    #   # Uses Excon
+    #   # Excon connection is created on the first call to `.run`
     #   sessions.run(excon_url) do |conn|
+    #     p conn.head.code
+    #   end
+    #
+    #
+    #   # Add a connection, which returns a HotTub::Pool instance
+    #
+    #   excon_url2 = "http://somewebservice2.com"
+    #
+    #   MY_CON = sessions.add(excon_url2,{:size => 5}) {
+    #     Excon.new(excon_url2, :thread_safe_socket => false)
+    #    }
+    #
+    #   # Uses Excon
+    #   MY_CON.run(excon_url) do |conn|
     #     p conn.head.code
     #   end
     #
@@ -68,28 +84,59 @@ module HotTub
       @default_client       = default_client
       @pool_options         = (opts[:pool_options] || {})
 
+      @_staged              = {}
+      @_staged.taint
+      
       @_sessions            = {}
       @_sessions.taint
+
       @mutex                = Mutex.new
       @shutdown             = false
 
       at_exit {shutdown!}
     end
 
-    # Adds a new HotTub::Pool for the given key unless
-    # one already exists.
-    def get_or_set(key, pool_options={}, &client_block)
-      pool = nil
-      return pool if pool = @_sessions[key]
-      clnt_blk = (client_block || @default_client)
-      op = @pool_options.merge(pool_options)
-      op[:sessions_key] = key
-      op[:name] = "#{@name} - #{key}"
+    # Sets arguments / settings for a session that will be 
+    # lazy loaded, returns nil because pool is not created
+    def stage(key, pool_options={}, &client_block)
       @mutex.synchronize do
-        @reaper ||= spawn_reaper if @reaper.nil?
-        pool = @_sessions[key] ||= HotTub::Pool.new(op, &clnt_blk) unless @shutdown
+        @_staged[key] = [pool_options,client_block]
+      end
+      nil
+    end
+
+    # Returns a HotTub::Pool for the given key. If a session
+    # is not found and the is a default_client set, a session will
+    # be created for the key using the default_client.
+    def get(key)
+      pool = @_sessions[key]
+      unless pool
+        @mutex.synchronize do
+          unless @shutdown
+            @reaper = spawn_reaper if @reaper.nil?
+            unless pool = @_sessions[key]
+              settings = @_staged[key]
+              clnt_blk = (settings[1] || @default_client)
+              op = @pool_options.merge(settings[0])
+              op[:sessions_key] = key
+              op[:name] = "#{@name} - #{key}"
+              pool = @_sessions[key] = HotTub::Pool.new(op, &clnt_blk)
+            end
+          end
+        end
       end
       pool
+    end
+
+    # Adds session unless it already exists and returns
+    # the session
+    def get_or_set(key, pool_options={}, &client_block)
+      unless @_staged[key]
+        @mutex.synchronize do
+          @_staged[key] ||= [pool_options,client_block]
+        end
+      end
+      get(key)
     end
     alias :add :get_or_set
 
@@ -109,7 +156,7 @@ module HotTub
     end
 
     def fetch(key)
-      unless pool = get_or_set(key, &@default_client)
+      unless pool = get(key, &@default_client)
         raise MissingSession, "A session could not be found for #{key.inspect} #{@name}"
       end
       pool
@@ -119,7 +166,7 @@ module HotTub
 
     def run(key, &run_block)
       pool = fetch(key)
-      pool.run &run_block
+      pool.run(&run_block)
     end
 
     def clean!

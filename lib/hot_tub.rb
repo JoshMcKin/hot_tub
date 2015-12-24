@@ -64,13 +64,18 @@ module HotTub
     GLOBAL_SESSIONS.get_or_set(url, opts, &client_block)
   end
   
+ # Sets a options for new pool for lazy loading
+  def self.stage(url,opts={}, &client_block)
+    GLOBAL_SESSIONS.stage(url, opts, &client_block)
+  end
+
   def self.add(url,opts={}, &client_block)
     self.get_or_set(url,opts, &client_block)
   end
 
   def self.run(url ,&run_block)
     pool = GLOBAL_SESSIONS.fetch(url)
-    pool.run &run_block
+    pool.run(&run_block)
   end
 
   def self.new(opts={}, &client_block)

@@ -65,10 +65,12 @@ A global Sessions object is available from the HotTub module and has several hel
 
     # We can add more HotTub::Pools with unique settings.
     # Lets add another HotTub::Pool of Excon clients with a pool size of 12.
-    # We are not setting :max_size so our connections will grow to match our currency.
-    # Once load dies down our pool will be reaped back down to 12 connections
+    # HotTub.stage sets the options passed to a settings cache, the pool is
+    # created the first time we call HotTub.run. We are not setting :max_size 
+    # so our connections will grow to match our currency. Once load dies down 
+    # our pool will be reaped back down to 12 connections
 
-    HotTub.add('excon_yahoo', { :size => 12} ) do
+    HotTub.stage('excon_yahoo', { :size => 12} ) do
      Excon.new("https://yahoo.com", :thread_safe_sockets => false )
     end
 

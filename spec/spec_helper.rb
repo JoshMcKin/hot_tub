@@ -8,6 +8,11 @@ require 'helpers/moc_client'
 require 'helpers/server'
 require 'net/https'
 
+begin
+  require 'byebug'
+rescue LoadError
+end
+
 unless HotTub.jruby? || HotTub.rbx?
   require 'coveralls'
   Coveralls.wear!

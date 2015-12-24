@@ -2,7 +2,21 @@ require 'spec_helper'
 require 'hot_tub/sessions'
 require 'uri'
 require 'time'
+
 describe HotTub::Sessions do
+
+  describe '#stage' do
+    let(:key) { "https://www.somewebsite.com" }
+
+    let(:sessions) { HotTub::Sessions.new }
+
+    it { expect(sessions.stage(key) { MocClient.new }).to be_nil }
+
+    it "should lazy load pool" do
+      sessions.stage(key) { MocClient.new }
+      expect(sessions.fetch(key)).to be_a(HotTub::Pool)
+    end
+  end
 
 
   describe '#get_or_set' do
