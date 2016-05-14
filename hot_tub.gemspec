@@ -14,7 +14,7 @@ Gem::Specification.new do |s|
 
   s.rubyforge_project = "hot_tub"
   
-  s.add_development_dependency "rspec"
+  s.add_development_dependency "rspec", "~> 3.0"
   s.add_development_dependency "rspec-autotest"
   s.add_development_dependency "autotest"
   s.add_development_dependency "sinatra"

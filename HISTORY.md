@@ -5,6 +5,11 @@ Head
 =======
 - None yet.
 
+1.0.1
+=======
+- Close orphan clients outside of synchonize
+- Freeze alarm message
+
 1.0.0
 =======
 - Allow setting a default client for HotTub::Sessions

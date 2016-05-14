@@ -234,7 +234,7 @@ module HotTub
 
     private
 
-    ALARM_MESSAGE = "Could not fetch a free client in time. Consider increasing your pool size."
+    ALARM_MESSAGE = "Could not fetch a free client in time. Consider increasing your pool size.".freeze
 
     def raise_alarm
       message = ALARM_MESSAGE
@@ -242,22 +242,28 @@ module HotTub
       raise Timeout, message
     end
 
+    def close_orphan(clnt)
+      HotTub.logger.info "[HotTub] An orphaned client attempted to return to #{@name}." if HotTub.log_trace?
+      close_client(clnt)
+    end
+
     # Safely add client back to pool, only if
     # that client is registered
     def push(clnt)
       if clnt
+        orphaned = false
         @mutex.synchronize do
           begin
             if !@shutdown && @_out.delete(clnt)
               @_pool << clnt
             else
-              close_client(clnt)
-              HotTub.logger.info "[HotTub] An orphaned client attempted to return to #{@name}." if HotTub.log_trace?
+              orphaned = true
             end
           ensure
             @cond.signal
           end
         end
+        close_orphan(clnt) if orphaned
         reap! if @blocking_reap
       end
       nil
