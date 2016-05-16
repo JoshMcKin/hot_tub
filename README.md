@@ -140,35 +140,8 @@ a lambda that accepts the client as an argument or symbol representing a method 
 
 ## Forking
 
-HotTub's `#reset!` methods close all idle connections, prevents connections in use from returning
-to the pool and attempts to close orphaned connections as they attempt to return.
+HotTub::Pool automatically detects forks and drains the pool, so no additional "after fork" code is required.
 
-    # Puma
-    on_worker_boot do
-
-      # If you let HotTub manage all your connections
-      HotTub.reset!
-
-      # If you have your own HotTub::Sessions
-      MY_SESSIONS.reset!
-
-      # If you have any one-off pools
-      MY_POOL.reset!
-
-    end
-
-    # Unicorn
-    before_fork do |server, worker|
-
-      # If you let HotTub manage all your connections
-      HotTub.reset!
-
-      # If you have your own HotTub::Sessions
-      MY_SESSIONS.reset!
-
-      # If you have any one-off pools
-      MY_POOL.reset!
-    end
 
 
 ## Contributing to HotTub

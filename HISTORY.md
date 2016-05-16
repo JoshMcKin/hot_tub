@@ -5,11 +5,12 @@ Head
 =======
 - None yet.
 
-1.0.1
+1.1.0
 =======
 - Close orphan clients outside of synchonize
 - Freeze alarm message
 - Detect dead resources and reap
+- Detect fork
 
 1.0.0
 =======

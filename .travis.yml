@@ -8,4 +8,4 @@ rvm:
   - 2.0.0-p648
   - ruby-head
   - rbx-2
-  - jruby-head
+  - jruby

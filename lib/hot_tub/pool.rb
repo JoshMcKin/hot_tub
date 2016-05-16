@@ -87,10 +87,13 @@ module HotTub
     # [:reap_timeout]
     #   Default is 600 seconds. An integer that represents the timeout for reaping the pool in seconds.
     #
+    # [:detect_fork]
+    #   Set to false to disable fork detection
+    #
     def initialize(opts={},&client_block)
       raise ArgumentError, 'a block that initializes a new client is required' unless block_given?
       @name             = (opts[:name] || self.class.name)
-      @size             = (opts[:size] || 5)            # in seconds
+      @size             = (opts[:size] || 5)
       @wait_timeout     = (opts[:wait_timeout] || 10)   # in seconds
       @reap_timeout     = (opts[:reap_timeout] || 600)  # the interval to reap connections in seconds
       @max_size         = (opts[:max_size] || 0)        # maximum size of pool when non-blocking, 0 means no limit
@@ -116,12 +119,15 @@ module HotTub
 
       @never_block      = (@max_size == 0)
 
+      @pid              = Process.pid unless opts[:detect_fork] == false
+
       at_exit {shutdown!} unless @sessions_key
     end
 
     # Preform an operations with a client/connection.
     # Requires a block that receives the client.
     def run
+      drain! if forked?
       clnt = pop
       yield clnt
     ensure
@@ -158,48 +164,22 @@ module HotTub
         ensure
           @_out.clear
           @_pool.clear
+          @pid = Process.pid
           @cond.broadcast
         end
       end
       nil
     end
     alias :close! :drain!
-
-    # Reset the pool.
-    # or if shutdown allow threads to quickly finish their work
-    # Clients from the previous pool will not return to pool.
-    def reset!
-      HotTub.logger.info "[HotTub] Resetting pool #{@name}!" if HotTub.logger
-      @mutex.synchronize do
-        begin
-          while clnt = @_pool.pop
-            close_client(clnt)
-          end
-        ensure
-          @_out.clear
-          @_pool.clear
-          @cond.broadcast
-        end
-      end
-      nil
-    end
+    alias :reset! :drain!
 
     # Kills the reaper and drains the pool.
     def shutdown!
       HotTub.logger.info "[HotTub] Shutting down pool #{@name}!" if HotTub.logger
       @shutdown = true
       kill_reaper if @reaper
-      @mutex.synchronize do
-        begin
-          while clnt = @_pool.pop
-            close_client(clnt)
-          end
-        ensure
-          @_out.clear
-          @_pool.clear
-          @cond.broadcast
-        end
-      end
+      drain!
+      @shutdown = false
       nil
     end
 
@@ -250,6 +230,10 @@ module HotTub
       @max_size = max_size
     end
 
+    def forked?
+      (@pid && (@pid != Process.pid))
+    end
+
     private
 
     ALARM_MESSAGE = "Could not fetch a free client in time. Consider increasing your pool size.".freeze
@@ -289,7 +273,7 @@ module HotTub
 
     # Safely pull client from pool, adding if allowed
     # If a client is not available, check for dead
-    # resources and schedule reap if nesseccary 
+    # resources and schedule reap if nesseccary
     def pop
       alarm = (Time.now + @wait_timeout)
       clnt = nil
