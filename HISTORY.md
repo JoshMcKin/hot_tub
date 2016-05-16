@@ -9,6 +9,7 @@ Head
 =======
 - Close orphan clients outside of synchonize
 - Freeze alarm message
+- Detect dead resources and reap
 
 1.0.0
 =======

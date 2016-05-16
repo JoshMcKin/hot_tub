@@ -169,14 +169,36 @@ describe HotTub::Pool do
       expect(pool.current_size).to eql(1)
       expect(old_client).to be_closed
     end
+
+    context "when client is lost with dead thread" do
+      it "should close dead client" do
+        pool = HotTub::Pool.new({ :size => 1, :close => :close }) { MocClient.new }
+        thread = Thread.new {}
+        thread.join
+        client = MocClient.new
+        pool.instance_variable_set(:@_out, {client => thread})
+        pool.reap!
+        expect(client).to be_closed
+      end
+    end
   end
 
   context 'private methods' do
-    let(:pool) { HotTub::Pool.new(:close => :close) { MocClient.new}  }
+    let(:pool) { HotTub::Pool.new( :close => :close) { MocClient.new}  }
 
     describe '#pop' do
       context "is allowed" do
         it "should work" do
+          expect(pool.send(:pop)).to be_a(MocClient)
+        end
+      end
+      context "has dead client" do
+        it "should return new client" do
+          pool.max_size = 1
+          thread = Thread.new {}
+          thread.join
+          client = MocClient.new
+          pool.instance_variable_set(:@_out, {client => thread})
           expect(pool.send(:pop)).to be_a(MocClient)
         end
       end

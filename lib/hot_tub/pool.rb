@@ -102,7 +102,7 @@ module HotTub
 
       @_pool            = []    # stores available clients
       @_pool.taint
-      @_out             = []    # stores all checked out clients
+      @_out             = {}    # stores all checked out clients
       @_out.taint
 
       @mutex            = Mutex.new
@@ -133,10 +133,15 @@ module HotTub
     def clean!
       HotTub.logger.info "[HotTub] Cleaning pool #{@name}!" if HotTub.logger
       @mutex.synchronize do
-        @_pool.each do |clnt|
-          clean_client(clnt)
+        begin
+          @_pool.each do |clnt|
+            clean_client(clnt)
+          end
+        ensure
+          @cond.signal
         end
       end
+      nil
     end
 
     # Drain the pool of all clients currently checked into the pool.
@@ -156,6 +161,7 @@ module HotTub
           @cond.broadcast
         end
       end
+      nil
     end
     alias :close! :drain!
 
@@ -202,21 +208,33 @@ module HotTub
     # reaping is a low priority action
     def reap!
       HotTub.logger.info "[HotTub] Reaping pool #{@name}!" if HotTub.log_trace?
-      reaped = nil
       while !@shutdown
+        reaped = nil
         @mutex.synchronize do
-          if _reap?
-            reaped = @_pool.shift
-          else
-            reaped = nil
+          begin
+            if _reap?
+              if _dead_clients?
+                reaped = @_out.select { |clnt, thrd| !thrd.alive? }.keys
+                @_out.delete_if { |k,v| reaped.include? k }
+              else
+                reaped = [@_pool.shift]
+              end
+            else
+              reaped = nil
+            end
+          ensure
+            @cond.signal
           end
         end
         if reaped
-          close_client(reaped)
+          reaped.each do |clnt|
+            close_client(clnt)
+          end
         else
           break
         end
       end
+      nil
     end
 
     def current_size
@@ -270,6 +288,8 @@ module HotTub
     end
 
     # Safely pull client from pool, adding if allowed
+    # If a client is not available, check for dead
+    # resources and schedule reap if nesseccary 
     def pop
       alarm = (Time.now + @wait_timeout)
       clnt = nil
@@ -277,13 +297,20 @@ module HotTub
       while !@shutdown
         raise_alarm if (Time.now > alarm)
         @mutex.synchronize do
-          if clnt = @_pool.pop
-            dirty = true
-            @_out << clnt
-          elsif clnt = _fetch_new(&@client_block)
-            @_out << clnt
-          else
-            @cond.wait(@mutex,@wait_timeout)
+          begin
+            if clnt = @_pool.pop
+              dirty = true
+            else
+              clnt = _fetch_new(&@client_block)
+            end
+          ensure
+            if clnt
+              _checkout(clnt)
+              @cond.signal
+            else
+              @reaper.wakeup if @reaper && _dead_clients?
+              @cond.wait(@mutex,@wait_timeout)
+            end
           end
         end
         break if clnt
@@ -293,6 +320,10 @@ module HotTub
     end
 
     ### START VOLATILE METHODS ###
+
+    def _checkout(clnt)
+      @_out[clnt] = Thread.current
+    end
 
     # Returns the total number of clients in the pool
     # and checked out. _total_current_size is volatile and
@@ -322,7 +353,14 @@ module HotTub
     # volatile; and may be inaccurate if called outside
     # @mutex.synchronize {}
     def _reap?
-      (!@shutdown && ((@_pool.length > @size) || reap_client?(@_pool[0])))
+      (!@shutdown && ((@_pool.length > @size) || _dead_clients? || reap_client?(@_pool[0])))
+    end
+
+    # Returns true if we have checked out clients whose resource is dead.
+    # _dead_clients? is volatile; and may be inaccurate if called outside
+    # @mutex.synchronize {}
+    def _dead_clients?
+      @_out.detect { |clnt, thrd| !thrd.alive? }
     end
 
     ### END VOLATILE METHODS ###
